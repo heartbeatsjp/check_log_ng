@@ -34,10 +34,8 @@ class LogChecker:
     SUFFIX_SEEK_WITH_INODE = ".inode.seek"
 
     def __init__(self, initial_data):
-        """Constructor.
-
-        Initialization of instance variable.
-        """
+        """ Constructor."""
+        # set default value
         self.logformat = LogChecker.FORMAT_SYSLOG
         self.pattern_list = []
         self.critical_pattern_list = []
@@ -83,7 +81,7 @@ class LogChecker:
     def _check_negative_pattern(self, line):
         """Check whether the line matches negative pattern.
 
-        If matched, return True.
+           If matched, return True.
         """
         if len(self.negpattern_list) == 0:
             return False
@@ -99,7 +97,7 @@ class LogChecker:
     def _check_critical_negative_pattern(self, line):
         """Check whether the line matches critical negative pattern.
 
-        If matched, return True.
+           If matched, return True.
         """
         if len(self.critical_negpattern_list) == 0:
             return False
@@ -115,7 +113,7 @@ class LogChecker:
     def _find_pattern(self, line):
         """Find pattern.
 
-        If found, return True.
+           If found, return True.
         """
         if len(self.pattern_list) == 0:
             return False
@@ -131,7 +129,7 @@ class LogChecker:
     def _find_critical_pattern(self, line):
         """Find critical pattern.
 
-        If found, return True.
+           If found, return True.
         """
         if len(self.critical_pattern_list) == 0:
             return False
