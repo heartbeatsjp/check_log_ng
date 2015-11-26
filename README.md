@@ -31,6 +31,12 @@ Defaults:nrpe !requiretty
 nagios ALL=(root) NOPASSWD: /usr/lib64/nagios/plugins/check_log_ng.py
 ```
 
+## Documentation
+
+Japanese Version Only...
+
+https://github.com/heartbeatsjp/check_log_ng/wiki
+
 ## Usage
 
 ```
