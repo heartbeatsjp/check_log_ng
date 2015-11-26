@@ -393,7 +393,7 @@ class LogChecker:
             state_string = 'CRITICAL'
         if self.state != LogChecker.STATE_OK:
             message = "%s: %s" % (state_string, ', '.join(self.messages))
-        return message
+        return message.replace('|', '(pipe)')
 
     @classmethod
     def get_pattern_list(cls, pattern_string, pattern_filename):

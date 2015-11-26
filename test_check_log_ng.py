@@ -951,6 +951,38 @@ class TestSequenceFunctions(unittest.TestCase):
         self.assertFalse(os.path.exists(seekfile1_1))
         self.assertTrue(os.path.exists(seekfile1_2))
 
+    def test_replace_pipe_symbol(self):
+        """replace pipe symbol
+        """
+        initial_data = {
+            "logformat": self.logformat_syslog,
+            "pattern_list": ["ERROR"],
+            "critical_pattern_list": [],
+            "negpattern_list": [],
+            "critical_negpattern_list": [],
+            "case_insensitive": False,
+            "warning": 1,
+            "critical": 0,
+            "nodiff_warn": False,
+            "nodiff_crit": False,
+            "trace_inode": False,
+            "multiline": False,
+            "scantime": 86400,
+            "expiration": 691200
+        }
+        log = LogChecker(initial_data)
+
+        f = open(self.logfile, 'a')
+        f.write("Dec | 5 12:34:56 hostname noop: NOOP\n")
+        f.write("Dec | 5 12:34:56 hostname test: ERROR\n")
+        f.write("Dec | 5 12:34:57 hostname noop: NOOP\n")
+        f.flush()
+        f.close()
+
+        log.check_log(self.logfile, self.seekfile)
+
+        self.assertEqual(log.get_state(), LogChecker.STATE_WARNING)
+        self.assertEqual(log.get_message(), 'WARNING: Found 1 lines (limit=1/0): Dec (pipe) 5 12:34:56 hostname test: ERROR at %s' % self.logfile)
 
 # class TestCommandLineParser(pikzie.TestCase):
 #
