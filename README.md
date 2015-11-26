@@ -4,7 +4,6 @@ Log file regular expression based parser plugin for Nagios.
 
 ## Installation
 
-
 Clone a copy of the main check_log_ng git repo and add execute permission.
 
 ```
@@ -106,6 +105,16 @@ Options:
                         output. See also --multiline.
   --debug               Enable debug.
 ```
+
+## Contributing
+
+If you have a problem, please [create an issue](https://github.com/heartbeatsjp/check_log_ng/issues) or a pull request.
+
+1. Fork it
+1. Create your feature branch (git checkout -b my-new-feature)
+1. Commit your changes (git commit -am 'Add some feature')
+1. Push to the branch (git push origin my-new-feature)
+1. Create new Pull Request
 
 ## License
 
