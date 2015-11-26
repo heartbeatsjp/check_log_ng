@@ -11,7 +11,6 @@ Clone a copy of the main check_log_ng git repo and add execute permission.
 $ git@github.com:heartbeatsjp/check_log_ng.git
 $ cd check_log_ng
 $ chmod 755 check_log_ng.py
-
 ```
 Copy this plugin to nagios-plugins directory.
 
@@ -110,4 +109,4 @@ Options:
 
 ## License
 
-BSD
+[BSD](https://github.com/heartbeatsjp/check_log_ng/blob/master/LICENSE.txt)
