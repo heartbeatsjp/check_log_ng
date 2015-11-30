@@ -395,8 +395,7 @@ class LogChecker:
             message = "%s: %s" % (state_string, ', '.join(self.messages))
         return message.replace('|', '(pipe)')
 
-    @classmethod
-    def get_pattern_list(cls, pattern_string, pattern_filename):
+    def get_pattern_list(pattern_string, pattern_filename):
         """Get the pattern list."""
         pattern_list = []
         if pattern_string:
@@ -411,9 +410,9 @@ class LogChecker:
                 if len(lines) > 0:
                     pattern_list.extend(lines)
         return pattern_list
+    get_pattern_list = staticmethod(get_pattern_list)
 
-    @classmethod
-    def expand_format_by_strftime(cls, format):
+    def expand_format_by_strftime(format):
         format = format.replace('%%', '_PERCENT_') \
             .replace('%F', '%Y-%m-%d') \
             .replace('%T', '%H:%M:%S') \
@@ -429,9 +428,9 @@ class LogChecker:
             .replace('%S', '(?:[0-5][0-9]|60)') \
             .replace('_PERCENT_', '%')
         return format
+    expand_format_by_strftime = staticmethod(expand_format_by_strftime)
 
-    @classmethod
-    def get_seekfile(cls, logfile_pattern, seekfile_directory, logfile, trace_inode=False):
+    def get_seekfile(logfile_pattern, seekfile_directory, logfile, trace_inode=False):
         """make filename of seekfile from logfile and get the filename."""
         prefix = None
         filename = None
@@ -444,9 +443,9 @@ class LogChecker:
             filename = prefix + '.' + filename
         seekfile = os.path.join(seekfile_directory, filename)
         return seekfile
+    get_seekfile = staticmethod(get_seekfile)
 
-    @classmethod
-    def update_seekfile(cls, seekfile, position):
+    def update_seekfile(seekfile, position):
         """Update the seek file for the log file."""
         tmp_seekfile = seekfile + "." + str(os.getpid)
         f = open(tmp_seekfile, 'w')
@@ -455,9 +454,9 @@ class LogChecker:
         f.close()
         os.rename(tmp_seekfile, seekfile)
         return True
+    update_seekfile = staticmethod(update_seekfile)
 
-    @classmethod
-    def read_seekfile(cls, seekfile):
+    def read_seekfile(seekfile):
         """Read the offset of the log file from its seek file."""
         if not os.path.exists(seekfile):
             return 0
@@ -465,9 +464,9 @@ class LogChecker:
         offset = int(f.readline())
         f.close()
         return offset
+    read_seekfile = staticmethod(read_seekfile)
 
-    @classmethod
-    def get_digest(cls, string):
+    def get_digest(string):
         """Get digest string."""
         m = None
         try:
@@ -489,9 +488,9 @@ class LogChecker:
         else:
             digest = base64.urlsafe_b64encode(string)
         return digest
+    get_digest = staticmethod(get_digest)
 
-    @classmethod
-    def make_parser(cls):
+    def make_parser():
         usage = "Usage: %prog [option ...]"
         version = "%%prog %s" % (CHECK_LOG_NG_VERSION)
         parser = OptionParser(usage=usage, version=version)
@@ -621,17 +620,17 @@ class LogChecker:
                           default=False,
                           help="Enable debug.")
         return parser
+    make_parser = staticmethod(make_parser)
 
-    @classmethod
-    def is_multiple_logifles(cls, pattern):
+    def is_multiple_logifles(pattern):
         m = re.search('[*? ]', pattern)
         if m is not None:
             return True
 
         return False
+    is_multiple_logifles = staticmethod(is_multiple_logifles)
 
-    @classmethod
-    def check_parser_options(cls, parser):
+    def check_parser_options(parser):
         global debug
         (options, args) = parser.parse_args()
         debug = options.debug
@@ -685,6 +684,7 @@ class LogChecker:
             sys.exit(LogChecker.STATE_UNKNOWN)
 
         return (options, args)
+    check_parser_options = staticmethod(check_parser_options)
 
 
 def main():
