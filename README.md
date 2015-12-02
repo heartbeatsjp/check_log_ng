@@ -125,3 +125,11 @@ If you have a problem, please [create an issue](https://github.com/heartbeatsjp/
 ## License
 
 [BSD](https://github.com/heartbeatsjp/check_log_ng/blob/master/LICENSE.txt)
+
+## Todo
+
+- caching result for a period of time
+- handling character encodings
+- support python 3
+- run tests in [walter](https://github.com/walter-cd/walter) automatically
+- improve the current test code coverage
