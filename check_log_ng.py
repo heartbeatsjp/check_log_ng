@@ -628,13 +628,13 @@ class LogChecker:
         return parser
     make_parser = staticmethod(make_parser)
 
-    def is_multiple_logifles(pattern):
+    def is_multiple_logfiles(pattern):
         m = re.search('[*? ]', pattern)
         if m is not None:
             return True
 
         return False
-    is_multiple_logifles = staticmethod(is_multiple_logifles)
+    is_multiple_logfiles = staticmethod(is_multiple_logfiles)
 
     def check_parser_options(parser):
         global debug
@@ -654,7 +654,7 @@ class LogChecker:
                     If check multiple log files, Use -S. If check single log file, Use -s or -S.")
             sys.exit(LogChecker.STATE_UNKNOWN)
 
-        is_multiple_logfiles = LogChecker.is_multiple_logifles(options.logfile_pattern)
+        is_multiple_logfiles = LogChecker.is_multiple_logfiles(options.logfile_pattern)
         if is_multiple_logfiles:
             if options.seekfile:
                 parser.error("If check multiple log files, options -s, --seekfile cannot be specified.")
@@ -725,7 +725,7 @@ def main():
 
     # execute check_log_multi or check_log
     seekfile = None
-    is_multiple_logfiles = LogChecker.is_multiple_logifles(options.logfile_pattern)
+    is_multiple_logfiles = LogChecker.is_multiple_logfiles(options.logfile_pattern)
     if is_multiple_logfiles:
         log.check_log_multi(options.logfile_pattern, options.seekfile_directory, options.remove_seekfile, options.seekfile_tag)
         state = log.get_state()
