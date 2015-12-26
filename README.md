@@ -61,6 +61,11 @@ Options:
                         The directory of the temporary file to store the seek
                         position of the last scan. If check multiple log
                         files, require this option.
+  -T <seekfile_tag>, --seekfile-tag=<seekfile_tag>
+                        Add a tag in the seek files names, to prevent names
+                        collisions. Useful to avoid maintaining many '-S'
+                        temporary directories when you check the same files
+                        several times with different options.
   -I, --trace-inode     Trace the inode of log files. If set, use inode
                         information as a seek file.
   -p <pattern>, --pattern=<pattern>

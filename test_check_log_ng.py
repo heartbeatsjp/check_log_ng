@@ -27,6 +27,9 @@ class TestSequenceFunctions(unittest.TestCase):
         self.logfile2 = os.path.join(logdir, 'testlog.2')
         self.logfile_pattern = os.path.join(logdir, 'testlog*')
 
+        self.tag1 = 'test1'
+        self.tag2 = 'test2'
+
         seekdir = os.path.join(testdir, 'seek')
         if not os.path.isdir(seekdir):
             os.mkdir(seekdir)
@@ -34,6 +37,10 @@ class TestSequenceFunctions(unittest.TestCase):
         self.seekfile = os.path.join(seekdir, 'testlog.seek')
         self.seekfile1 = LogChecker.get_seekfile(self.logfile_pattern, seekdir, self.logfile1)
         self.seekfile2 = LogChecker.get_seekfile(self.logfile_pattern, seekdir, self.logfile2)
+        self.seekfile3 = LogChecker.get_seekfile(self.logfile_pattern, seekdir, self.logfile, seekfile_tag=self.tag1)
+        self.seekfile4 = LogChecker.get_seekfile(self.logfile_pattern, seekdir, self.logfile, seekfile_tag=self.tag2)
+        self.seekfile5 = LogChecker.get_seekfile(self.logfile_pattern, seekdir, self.logfile1, seekfile_tag=self.tag2)
+        self.seekfile6 = LogChecker.get_seekfile(self.logfile_pattern, seekdir, self.logfile2, seekfile_tag=self.tag2)
 
         self.logformat_syslog = LogChecker.FORMAT_SYSLOG
 
@@ -44,6 +51,14 @@ class TestSequenceFunctions(unittest.TestCase):
             os.unlink(self.seekfile1)
         if os.path.exists(self.seekfile2):
             os.unlink(self.seekfile2)
+        if os.path.exists(self.seekfile3):
+            os.unlink(self.seekfile3)
+        if os.path.exists(self.seekfile4):
+            os.unlink(self.seekfile4)
+        if os.path.exists(self.seekfile5):
+            os.unlink(self.seekfile5)
+        if os.path.exists(self.seekfile6):
+            os.unlink(self.seekfile6)
 
         if os.path.exists(self.logfile):
             seekfile = LogChecker.get_seekfile(self.logfile_pattern, self.seekdir, self.logfile, trace_inode=True)
@@ -983,6 +998,63 @@ class TestSequenceFunctions(unittest.TestCase):
 
         self.assertEqual(log.get_state(), LogChecker.STATE_WARNING)
         self.assertEqual(log.get_message(), 'WARNING: Found 1 lines (limit=1/0): Dec (pipe) 5 12:34:56 hostname test: ERROR at %s' % self.logfile)
+
+    def test_seekfile_tag(self):
+        """--seekfile-tag
+        """
+        initial_data = {
+            "logformat": self.logformat_syslog,
+            "pattern_list": ["ERROR"],
+            "critical_pattern_list": [],
+            "negpattern_list": [],
+            "critical_negpattern_list": [],
+            "case_insensitive": False,
+            "warning": 1,
+            "critical": 0,
+            "nodiff_warn": False,
+            "nodiff_crit": False,
+            "trace_inode": False,
+            "multiline": False,
+            "scantime": 86400,
+            "expiration": 691200
+        }
+        log = LogChecker(initial_data)
+
+        # create new logfiles
+        f = open(self.logfile, 'a')
+        f.write("Dec  5 12:34:51 hostname noop: NOOP\n")
+        f.write("Dec  5 12:34:51 hostname test: ERROR\n")
+        f.write("Dec  5 12:34:52 hostname noop: NOOP\n")
+        f.flush()
+        f.close()
+
+        f = open(self.logfile1, 'a')
+        f.write("Dec  5 12:34:56 hostname noop: NOOP\n")
+        f.write("Dec  5 12:34:56 hostname test: ERROR\n")
+        f.write("Dec  5 12:34:57 hostname noop: NOOP\n")
+        f.flush()
+        f.close()
+
+        f = open(self.logfile2, 'a')
+        f.write("Dec  5 12:34:58 hostname noop: NOOP\n")
+        f.write("Dec  5 12:34:59 hostname noop: NOOP\n")
+        f.flush()
+        f.close()
+
+        # create seekfile of logfile
+        seekfile_1 = LogChecker.get_seekfile(self.logfile_pattern, self.seekdir, self.logfile, seekfile_tag=self.tag1)
+        seekfile_2 = LogChecker.get_seekfile(self.logfile_pattern, self.seekdir, self.logfile, seekfile_tag=self.tag1)
+        seekfile_3 = LogChecker.get_seekfile(self.logfile_pattern, self.seekdir, self.logfile, seekfile_tag=self.tag2)
+        log.check_log(self.logfile, seekfile_3)
+        log.clear_state()
+        log.check_log_multi(self.logfile_pattern, self.seekdir, seekfile_tag=self.tag2)
+
+        self.assertEqual(log.get_state(), LogChecker.STATE_WARNING)
+        self.assertEqual(log.get_message(), 'WARNING: Found 1 lines (limit=1/0): Dec  5 12:34:56 hostname test: ERROR at %s' % self.logfile1)
+        self.assertEqual(seekfile_1, seekfile_2)
+        self.assertNotEquals(seekfile_1, seekfile_3)
+        self.assertTrue(seekfile_1.find(self.tag1))
+        self.assertTrue(os.path.exists(seekfile_3))
 
 # class TestCommandLineParser(pikzie.TestCase):
 #
