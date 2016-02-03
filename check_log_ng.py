@@ -142,7 +142,7 @@ class LogChecker:
                 return True
         return False
 
-    def _remove_old_seekfile(self, seekfile_directory, logfile_pattern_list):
+    def _remove_old_seekfile(self, seekfile_directory, logfile_pattern_list, seekfile_tag=''):
         """Remove old seek files."""
         cwd = os.getcwd()
         try:
@@ -155,7 +155,7 @@ class LogChecker:
         for logfile_pattern in logfile_pattern_list.split():
             if logfile_pattern is None or logfile_pattern == '':
                 continue
-            seekfile_pattern = re.sub(r'[^-0-9A-Za-z*?]', '_', logfile_pattern) + LogChecker.SUFFIX_SEEK
+            seekfile_pattern = re.sub(r'[^-0-9A-Za-z*?]', '_', logfile_pattern) + seekfile_tag + LogChecker.SUFFIX_SEEK
             for seekfile in glob.glob(seekfile_pattern):
 
                 if not os.path.isfile(seekfile):
@@ -177,7 +177,7 @@ class LogChecker:
 
         return True
 
-    def _remove_old_seekfile_with_inode(self, logfile_pattern, seekfile_directory):
+    def _remove_old_seekfile_with_inode(self, logfile_pattern, seekfile_directory, seekfile_tag=''):
         """Remove old inode-based seek files."""
         prefix = None
         if self.trace_inode:
@@ -191,7 +191,7 @@ class LogChecker:
             sys.exit(LogChecker.STATE_UNKNOWN)
 
         curtime = time.time()
-        seekfile_pattern = prefix + '.[0-9]*' + LogChecker.SUFFIX_SEEK_WITH_INODE
+        seekfile_pattern = prefix + '.[0-9]*' + seekfile_tag + LogChecker.SUFFIX_SEEK_WITH_INODE
         for seekfile in glob.glob(seekfile_pattern):
             if not os.path.isfile(seekfile):
                 continue
@@ -349,21 +349,21 @@ class LogChecker:
         LogChecker.update_seekfile(seekfile, end_position)
         return
 
-    def check_log_multi(self, logfile_pattern, seekfile_directory, remove_seekfile=False):
+    def check_log_multi(self, logfile_pattern, seekfile_directory, remove_seekfile=False, seekfile_tag=''):
         """Check the multiple log files."""
         logfile_list = self._get_logfile_list(logfile_pattern)
         for logfile in logfile_list:
             if not os.path.isfile(logfile):
                 continue
             seekfile = LogChecker.get_seekfile(logfile_pattern, seekfile_directory, logfile,
-                                               trace_inode=self.trace_inode)
+                                               trace_inode=self.trace_inode, seekfile_tag=seekfile_tag)
             self.check_log(logfile, seekfile)
 
         if remove_seekfile:
             if self.trace_inode:
-                self._remove_old_seekfile_with_inode(logfile_pattern, seekfile_directory)
+                self._remove_old_seekfile_with_inode(logfile_pattern, seekfile_directory, seekfile_tag)
             else:
-                self._remove_old_seekfile(seekfile_directory, logfile_pattern)
+                self._remove_old_seekfile(seekfile_directory, logfile_pattern, seekfile_tag)
 
     def clear_state(self):
         """Clear the state of the result."""
@@ -430,15 +430,15 @@ class LogChecker:
         return format
     expand_format_by_strftime = staticmethod(expand_format_by_strftime)
 
-    def get_seekfile(logfile_pattern, seekfile_directory, logfile, trace_inode=False):
+    def get_seekfile(logfile_pattern, seekfile_directory, logfile, trace_inode=False, seekfile_tag=''):
         """make filename of seekfile from logfile and get the filename."""
         prefix = None
         filename = None
         if trace_inode:
-            filename = str(os.stat(logfile).st_ino) + LogChecker.SUFFIX_SEEK_WITH_INODE
+            filename = str(os.stat(logfile).st_ino) + seekfile_tag + LogChecker.SUFFIX_SEEK_WITH_INODE
             prefix = LogChecker.get_digest(logfile_pattern)
         else:
-            filename = re.sub(r'[^-0-9A-Za-z]', '_', logfile) + LogChecker.SUFFIX_SEEK
+            filename = re.sub(r'[^-0-9A-Za-z]', '_', logfile) + seekfile_tag + LogChecker.SUFFIX_SEEK
         if prefix is not None:
             filename = prefix + '.' + filename
         seekfile = os.path.join(seekfile_directory, filename)
@@ -516,6 +516,12 @@ class LogChecker:
                           dest="seekfile_directory",
                           metavar="<seekfile_directory>",
                           help="The directory of the temporary file to store the seek position of the last scan. If check multiple log files, require this option.")
+        parser.add_option("-T", "--seekfile-tag",
+                          action="store",
+                          dest="seekfile_tag",
+                          default="",
+                          metavar="<seekfile_tag>",
+                          help="Add a tag in the seek files names, to prevent names collisions. Useful to avoid maintaining many '-S' temporary directories when you check the same files several times with different options.")
         parser.add_option("-I", "--trace-inode",
                           action="store_true",
                           dest="trace_inode",
@@ -622,13 +628,13 @@ class LogChecker:
         return parser
     make_parser = staticmethod(make_parser)
 
-    def is_multiple_logifles(pattern):
+    def is_multiple_logfiles(pattern):
         m = re.search('[*? ]', pattern)
         if m is not None:
             return True
 
         return False
-    is_multiple_logifles = staticmethod(is_multiple_logifles)
+    is_multiple_logfiles = staticmethod(is_multiple_logfiles)
 
     def check_parser_options(parser):
         global debug
@@ -648,7 +654,7 @@ class LogChecker:
                     If check multiple log files, Use -S. If check single log file, Use -s or -S.")
             sys.exit(LogChecker.STATE_UNKNOWN)
 
-        is_multiple_logfiles = LogChecker.is_multiple_logifles(options.logfile_pattern)
+        is_multiple_logfiles = LogChecker.is_multiple_logfiles(options.logfile_pattern)
         if is_multiple_logfiles:
             if options.seekfile:
                 parser.error("If check multiple log files, options -s, --seekfile cannot be specified.")
@@ -719,9 +725,9 @@ def main():
 
     # execute check_log_multi or check_log
     seekfile = None
-    is_multiple_logfiles = LogChecker.is_multiple_logifles(options.logfile_pattern)
+    is_multiple_logfiles = LogChecker.is_multiple_logfiles(options.logfile_pattern)
     if is_multiple_logfiles:
-        log.check_log_multi(options.logfile_pattern, options.seekfile_directory, options.remove_seekfile)
+        log.check_log_multi(options.logfile_pattern, options.seekfile_directory, options.remove_seekfile, options.seekfile_tag)
         state = log.get_state()
         print log.get_message()
     else:
@@ -730,8 +736,8 @@ def main():
             seekfile = options.seekfile
         elif options.seekfile_directory:
             logfile = options.logfile_pattern
-            seekfile = LogChecker.get_seekfile(options.logfile_pattern, options.seekfile_directory,
-                                               logfile, trace_inode=options.trace_inode)
+            seekfile = LogChecker.get_seekfile(options.logfile_pattern, options.seekfile_directory, logfile,
+                                               trace_inode=options.trace_inode, seekfile_tag=options.seekfile_tag)
 
         log.check_log(options.logfile_pattern, seekfile)
         state = log.get_state()
