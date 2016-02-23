@@ -7,6 +7,7 @@ import glob
 import time
 import re
 import base64
+import pickle
 from optparse import OptionParser
 
 # Globals
@@ -691,6 +692,19 @@ class LogChecker:
 
         return (options, args)
     check_parser_options = staticmethod(check_parser_options)
+
+    def serialize_optargs(options, args):
+        serialized = []
+        _options = eval(str(options))
+        for key in sorted(_options.keys()):
+            serialized.append(str(key))
+            serialized.append(str(_options.get(key)))
+        serialized.extend(args)
+        dumped = pickle.dumps(serialized)
+
+        return LogChecker.get_digest(dumped)
+
+    serialize_optargs = staticmethod(serialize_optargs)
 
 
 def main():
