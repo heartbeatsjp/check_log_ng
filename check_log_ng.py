@@ -703,8 +703,13 @@ class LogChecker:
         dumped = pickle.dumps(serialized)
 
         return LogChecker.get_digest(dumped)
-
     serialize_optargs = staticmethod(serialize_optargs)
+
+    def is_expired(cache_file, cache_time):
+        now = time.time()
+        last_updated_time = os.stat(cache_file).st_mtime
+        return (last_updated_time + cache_time) < now
+    is_expired = staticmethod(is_expired)
 
 
 def main():
