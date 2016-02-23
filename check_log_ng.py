@@ -724,6 +724,19 @@ class LogChecker:
             pass
     load_cache = staticmethod(load_cache)
 
+    def create_cache(cache_file, message, state):
+        try:
+            tmp_file = ".".join([cache_file, str(os.getpid())])
+            f = open(tmp_file, mode="w")
+            f.write(pickle.dumps([message, state]))
+            f.close()
+            os.chmod(tmp_file, 0666)
+            os.rename(tmp_file, cache_file)
+        except:
+            _debug("Cannot create cache file %s" % (cache_file))
+            pass
+    create_cache = staticmethod(create_cache)
+
 
 def main():
     parser = LogChecker.make_parser()
