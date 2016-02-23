@@ -621,6 +621,12 @@ class LogChecker:
                           dest="multiline",
                           default=False,
                           help="Consider multiple lines with same key as one log output. See also --multiline.")
+        parser.add_option("-C", "--cache-time",
+                          action="store",
+                          type="int",
+                          dest="cache_time",
+                          default=None,
+                          help="The cache expiration time.")
         parser.add_option("--debug",
                           action="store_true",
                           dest="debug",
@@ -742,6 +748,16 @@ def main():
     parser = LogChecker.make_parser()
     (options, args) = LogChecker.check_parser_options(parser)
 
+    # return previous results if cache is not expired
+    if options.cache_time:
+        cache_file = "/tmp/check_log_ng.%s" % LogChecker.serialize_optargs(options, args)
+        prev_result = LogChecker.load_cache(cache_file, options.cache_time)
+        if prev_result:
+            message = str(prev_result[0])
+            state = int(prev_result[1])
+            print message
+            sys.exit(state)
+
     # make pattern list
     pattern_list = LogChecker.get_pattern_list(options.pattern, options.patternfile)
     critical_pattern_list = LogChecker.get_pattern_list(options.critical_pattern, options.critical_patternfile)
@@ -773,8 +789,6 @@ def main():
     is_multiple_logfiles = LogChecker.is_multiple_logfiles(options.logfile_pattern)
     if is_multiple_logfiles:
         log.check_log_multi(options.logfile_pattern, options.seekfile_directory, options.remove_seekfile, options.seekfile_tag)
-        state = log.get_state()
-        print log.get_message()
     else:
         # create seekfile
         if options.seekfile:
@@ -785,8 +799,14 @@ def main():
                                                trace_inode=options.trace_inode, seekfile_tag=options.seekfile_tag)
 
         log.check_log(options.logfile_pattern, seekfile)
-        state = log.get_state()
-        print log.get_message()
+
+    state = log.get_state()
+    message = log.get_message()
+    print message
+
+    # store cache of result
+    if options.cache_time:
+        LogChecker.create_cache(cache_file, message, state)
 
     sys.exit(state)
 
