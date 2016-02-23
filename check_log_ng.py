@@ -711,6 +711,19 @@ class LogChecker:
         return (last_updated_time + cache_time) < now
     is_expired = staticmethod(is_expired)
 
+    def load_cache(cache_file, cache_time):
+        try:
+            if os.path.exists(cache_file) and not LogChecker.is_expired(cache_file, cache_time):
+                _debug("Enable cache")
+                f = open(cache_file, "r")
+                prev_result = pickle.load(f)
+                f.close()
+                return prev_result
+        except:
+            _debug("Cannot load cache file %s" % (cache_file))
+            pass
+    load_cache = staticmethod(load_cache)
+
 
 def main():
     parser = LogChecker.make_parser()
