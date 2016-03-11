@@ -727,7 +727,7 @@ class LogChecker:
                 return prev_result
         except:
             _debug("Cannot load cache file %s" % (cache_file))
-            pass
+            raise Exception("Cannot create cache file %s" % (cache_file))
     load_cache = staticmethod(load_cache)
 
     def create_cache(cache_file, message, state):
@@ -740,8 +740,13 @@ class LogChecker:
             os.rename(tmp_file, cache_file)
         except:
             _debug("Cannot create cache file %s" % (cache_file))
-            pass
+            raise Exception("Cannot create cache file %s" % (cache_file))
     create_cache = staticmethod(create_cache)
+
+
+    def is_cachefile_avail(cache_file):
+        return os.path.isfile(cache_file) and os.access(cache_file, os.R_OK) and os.access(cache_file, os.W_OK)
+    is_cachefile_avail = staticmethod(is_cachefile_avail)
 
 
 def main():
@@ -751,12 +756,20 @@ def main():
     # return previous results if cache is not expired
     if options.cache_time:
         cache_file = "/tmp/check_log_ng.%s" % LogChecker.serialize_optargs(options, args)
-        prev_result = LogChecker.load_cache(cache_file, options.cache_time)
-        if prev_result:
-            message = str(prev_result[0])
-            state = int(prev_result[1])
-            print message
-            sys.exit(state)
+        try:
+            prev_result = LogChecker.load_cache(cache_file, options.cache_time)
+            if prev_result:
+                message = str(prev_result[0])
+                state = int(prev_result[1])
+                print message
+                sys.exit(state)
+            if not LogChecker.is_cachefile_avail(cache_file):
+                print "cache file %s does not available" % (cache_file)
+                sys.exit(LogChecker.STATE_UNKNOWN)
+        except Exception as e:
+            print e.message
+            sys.exit(LogChecker.STATE_UNKNOWN)
+
 
     # make pattern list
     pattern_list = LogChecker.get_pattern_list(options.pattern, options.patternfile)
@@ -806,7 +819,11 @@ def main():
 
     # store cache of result
     if options.cache_time:
-        LogChecker.create_cache(cache_file, message, state)
+        try:
+            LogChecker.create_cache(cache_file, message, state)
+        except Exception as e:
+            print e.message
+            sys.exit(LogChecker.STATE_UNKNOWN)
 
     sys.exit(state)
 
