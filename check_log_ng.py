@@ -692,34 +692,40 @@ class LogChecker:
         return (options, args)
     check_parser_options = staticmethod(check_parser_options)
 
+    def generate_initial_data(options):
+        """Generate initial data."""
+        # make pattern list
+        pattern_list = LogChecker.get_pattern_list(options.pattern, options.patternfile)
+        critical_pattern_list = LogChecker.get_pattern_list(options.critical_pattern, options.critical_patternfile)
+        negpattern_list = LogChecker.get_pattern_list(options.negpattern, options.negpatternfile)
+        critical_negpattern_list = LogChecker.get_pattern_list(options.critical_negpattern, options.critical_negpatternfile)
+
+        # set value of options
+        initial_data = {
+            "logformat": options.logformat,
+            "pattern_list": pattern_list,
+            "critical_pattern_list": critical_pattern_list,
+            "negpattern_list": negpattern_list,
+            "critical_negpattern_list": critical_negpattern_list,
+            "case_insensitive": options.case_insensitive,
+            "warning": options.warning,
+            "critical": options.critical,
+            "nodiff_warn": options.nodiff_warn,
+            "nodiff_crit": options.nodiff_crit,
+            "trace_inode": options.trace_inode,
+            "multiline": options.multiline,
+            "scantime": options.scantime,
+            "expiration": options.expiration
+        }
+        return initial_data
+    generate_initial_data = staticmethod(generate_initial_data)
+
 
 def main():
     parser = LogChecker.make_parser()
     (options, args) = LogChecker.check_parser_options(parser)
 
-    # make pattern list
-    pattern_list = LogChecker.get_pattern_list(options.pattern, options.patternfile)
-    critical_pattern_list = LogChecker.get_pattern_list(options.critical_pattern, options.critical_patternfile)
-    negpattern_list = LogChecker.get_pattern_list(options.negpattern, options.negpatternfile)
-    critical_negpattern_list = LogChecker.get_pattern_list(options.critical_negpattern, options.critical_negpatternfile)
-
-    # set value of options
-    initial_data = {
-        "logformat": options.logformat,
-        "pattern_list": pattern_list,
-        "critical_pattern_list": critical_pattern_list,
-        "negpattern_list": negpattern_list,
-        "critical_negpattern_list": critical_negpattern_list,
-        "case_insensitive": options.case_insensitive,
-        "warning": options.warning,
-        "critical": options.critical,
-        "nodiff_warn": options.nodiff_warn,
-        "nodiff_crit": options.nodiff_crit,
-        "trace_inode": options.trace_inode,
-        "multiline": options.multiline,
-        "scantime": options.scantime,
-        "expiration": options.expiration
-    }
+    initial_data = LogChecker.generate_initial_data(options)
     log = LogChecker(initial_data)
     state = LogChecker.STATE_OK
 
