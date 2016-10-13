@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 # coding: utf-8
 # Python 2.4 - 2.7
 import sys
@@ -8,6 +8,7 @@ import time
 import re
 import base64
 import pickle
+import filelock
 from optparse import OptionParser
 
 # Globals
@@ -33,6 +34,8 @@ class LogChecker:
     FORMAT_SYSLOG = '^((?:%b\s%e\s%T|%FT%T\S*)\s[-_0-9A-Za-z.]+\s(?:[^ :\[\]]+(?:\[\d+?\])?:\s)?)(.*)$'
     SUFFIX_SEEK = ".seek"
     SUFFIX_SEEK_WITH_INODE = ".inode.seek"
+
+    lock = None
 
     def __init__(self, initial_data):
         """ Constructor."""
@@ -744,15 +747,7 @@ class LogChecker:
     create_cache = staticmethod(create_cache)
 
 
-    def is_cachefile_avail(cache_file):
-        return os.path.isfile(cache_file) and os.access(cache_file, os.R_OK) and os.access(cache_file, os.W_OK)
-    is_cachefile_avail = staticmethod(is_cachefile_avail)
-
-
-def main():
-    parser = LogChecker.make_parser()
-    (options, args) = LogChecker.check_parser_options(parser)
-
+def run(options, args):
     # return previous results if cache is not expired
     if options.cache_time:
         cache_file = "/tmp/check_log_ng.%s" % LogChecker.serialize_optargs(options, args)
@@ -761,15 +756,12 @@ def main():
             if prev_result:
                 message = str(prev_result[0])
                 state = int(prev_result[1])
-                print message
-                sys.exit(state)
-            if not LogChecker.is_cachefile_avail(cache_file):
-                print "cache file %s does not available" % (cache_file)
-                sys.exit(LogChecker.STATE_UNKNOWN)
-        except Exception as e:
-            print e.message
-            sys.exit(LogChecker.STATE_UNKNOWN)
+                return message, state
 
+            # confirm cache is available
+            LogChecker.create_cache(cache_file, "__", LogChecker.STATE_DEPENDENT)
+        except Exception as e:
+            return e.message, LogChecker.STATE_UNKNOWN
 
     # make pattern list
     pattern_list = LogChecker.get_pattern_list(options.pattern, options.patternfile)
@@ -815,18 +807,34 @@ def main():
 
     state = log.get_state()
     message = log.get_message()
-    print message
 
     # store cache of result
     if options.cache_time:
         try:
             LogChecker.create_cache(cache_file, message, state)
         except Exception as e:
-            print e.message
-            sys.exit(LogChecker.STATE_UNKNOWN)
+            message = e.message
+            state = LogChecker.STATE_UNKNOWN
 
+    return message, state
+
+
+def main():
+    parser = LogChecker.make_parser()
+    (options, args) = LogChecker.check_parser_options(parser)
+
+    lock_file = os.path.join(options.seekfile_directory,
+                             "check_log_ng.%s.lock" % LogChecker.serialize_optargs(options, args))
+    LogChecker.lock = filelock.FileLock(lock_file)
+    LogChecker.lock.acquire(timeout=10)
+    try:
+        message, state = run(options, args)
+    finally:
+        if LogChecker.lock:
+            LogChecker.lock.release()
+
+    print message
     sys.exit(state)
-
 
 if __name__ == "__main__":
     main()
