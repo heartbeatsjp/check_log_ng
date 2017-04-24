@@ -3,6 +3,6 @@ python:
   - "2.6"
   - "2.7"
 install:
-  - [[ -f requirements.txt ]] && pip install -r requirements.txt
+  - "[[ -f requirements.txt ]] && pip install -r requirements.txt"
 script:
   - PYTHONPATH=. python -m unittest test_check_log_ng
