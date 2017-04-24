@@ -1,5 +1,7 @@
 # check_log_ng
 
+![Build Status](https://travis-ci.org/heartbeatsjp/check_log_ng.svg?branch=master)
+
 Log file regular expression based parser plugin for Nagios.
 
 ## Installation
@@ -136,5 +138,4 @@ If you have a problem, please [create an issue](https://github.com/heartbeatsjp/
 - caching result for a period of time
 - handling character encodings
 - support python 3
-- run tests in [walter](https://github.com/walter-cd/walter) automatically
 - improve the current test code coverage
