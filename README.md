@@ -116,6 +116,10 @@ Options:
                         Remove expired seek files. See also --expiration.
   -M, --multiline       Consider multiple lines with same key as one log
                         output. See also --multiline.
+  --cache               Cache the result for the period specified by the
+                        option --cachetime.
+  --cachetime=<seconds>
+                        The period to cache the result. Default is 60.
   --debug               Enable debug.
 ```
 
@@ -135,7 +139,6 @@ If you have a problem, please [create an issue](https://github.com/heartbeatsjp/
 
 ## Todo
 
-- caching result for a period of time
 - handling character encodings
 - support python 3
 - improve the current test code coverage

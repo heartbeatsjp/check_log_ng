@@ -7,6 +7,8 @@ import glob
 import time
 import re
 import base64
+import fcntl
+import signal
 from optparse import OptionParser
 
 # Globals
@@ -18,6 +20,8 @@ def _debug(string):
     if debug:
         print "DEBUG: %s" % string
 
+def _signal_handler(signum, frame):
+    raise IOError("Locked.")
 
 class LogChecker:
 
@@ -29,9 +33,15 @@ class LogChecker:
     STATE_CRITICAL = 2
     STATE_UNKNOWN = 3
     STATE_DEPENDENT = 4
+    STATE_NO_CACHE = -1
     FORMAT_SYSLOG = '^((?:%b\s%e\s%T|%FT%T\S*)\s[-_0-9A-Za-z.]+\s(?:[^ :\[\]]+(?:\[\d+?\])?:\s)?)(.*)$'
     SUFFIX_SEEK = ".seek"
     SUFFIX_SEEK_WITH_INODE = ".inode.seek"
+    SUFFIX_CACHE = ".cache"
+    SUFFIX_LOCK = ".lock"
+    PREFIX_DATA = "check_log_ng"
+    LOCK_TIMEOUT = 5
+    RETRY_PERIOD = 1
 
     def __init__(self, initial_data):
         """ Constructor."""
@@ -50,6 +60,8 @@ class LogChecker:
         self.multiline = False
         self.scantime = 86400
         self.expiration = 691200
+        self.cache = False
+        self.cachetime = 60
 
         # set initial_data
         for key in initial_data:
@@ -315,6 +327,60 @@ class LogChecker:
         f.close()
         return end_position
 
+    def check(self, logfile_pattern, seekfile, seekfile_directory,
+              remove_seekfile=False, seekfile_tag=''):
+        """Execute check_log_multi or check_log.
+        If cache is enabled and exists, return cache.
+        """
+        if self.cache:
+            prefix_datafile = LogChecker.get_prefix_datafile(seekfile, seekfile_directory, seekfile_tag)
+            cachefile = "".join([prefix_datafile, LogChecker.SUFFIX_CACHE])
+            lockfile = "".join([prefix_datafile, LogChecker.SUFFIX_LOCK])
+            locked = False
+            curtime = time.time()
+            timeout = curtime + LogChecker.LOCK_TIMEOUT
+            while curtime < timeout:
+                state, message = self.get_cache(cachefile)
+                if state != LogChecker.STATE_NO_CACHE:
+                    self.state = state
+                    self.message = message
+                    print self.get_message()
+                    return state
+                lockfileobj = LogChecker.lock(lockfile)
+                if lockfileobj:
+                    locked = True
+                    break
+            if not locked:
+                self.state = LogChecker.STATE_UNKNOWN
+                self.message = "UNKNOWN: Another process is executing."
+                print self.get_message()
+                return state
+
+        seekfile = None
+        is_multiple_logfiles = LogChecker.is_multiple_logfiles(logfile_pattern)
+        if is_multiple_logfiles:
+            self.check_log_multi(logfile_pattern, seekfile_directory,
+                                 remove_seekfile, seekfile_tag)
+            state = self.get_state()
+            print self.get_message()
+        else:
+            # create seekfile
+            if not seekfile and seekfile_directory:
+                logfile = logfile_pattern
+                seekfile = LogChecker.get_seekfile(logfile_pattern,
+                                                   seekfile_directory, logfile,
+                                                   trace_inode=self.trace_inode,
+                                                   seekfile_tag=seekfile_tag)
+            self.check_log(logfile_pattern, seekfile)
+            state = self.get_state()
+            print self.get_message()
+
+        if self.cache:
+            self.update_cache(cachefile)
+            LogChecker.unlock(lockfile, lockfileobj)
+
+        return state
+
     def check_log(self, logfile, seekfile):
         """Check the log file."""
         _debug("logfile='%s', seekfile='%s'" % (logfile, seekfile))
@@ -368,6 +434,7 @@ class LogChecker:
     def clear_state(self):
         """Clear the state of the result."""
         self.state = None
+        self.message = None
         self.messages = []
         self.found = []
         self.found_messages = []
@@ -385,15 +452,42 @@ class LogChecker:
         """Get the message of the result."""
         if self.state is None:
             self._update_state()
-        state_string = 'OK'
-        message = 'OK - No matches found.'
-        if self.state == LogChecker.STATE_WARNING:
-            state_string = 'WARNING'
-        elif self.state == LogChecker.STATE_CRITICAL:
-            state_string = 'CRITICAL'
-        if self.state != LogChecker.STATE_OK:
-            message = "%s: %s" % (state_string, ', '.join(self.messages))
-        return message.replace('|', '(pipe)')
+        if self.message is None:
+            state_string = 'OK'
+            message = 'OK - No matches found.'
+            if self.state == LogChecker.STATE_WARNING:
+                state_string = 'WARNING'
+            elif self.state == LogChecker.STATE_CRITICAL:
+                state_string = 'CRITICAL'
+            if self.state != LogChecker.STATE_OK:
+                message = "%s: %s" % (state_string, ', '.join(self.messages))
+            self.message = message.replace('|', '(pipe)')
+        return self.message
+
+    def get_cache(self, cachefile):
+        """Get the cache."""
+        if not os.path.exists(cachefile):
+            return LogChecker.STATE_NO_CACHE, None
+        if os.stat(cachefile).st_mtime < time.time() - self.cachetime:
+            _debug("Cache is expired: mtime < curtime - cachetime")
+            return LogChecker.STATE_NO_CACHE, None
+        f = open(cachefile)
+        line = f.readline()
+        f.close()
+        state, message = line.split("\t", 1)
+        return int(state), message
+
+    def update_cache(self, cachefile):
+        """Update the cache."""
+        tmp_cachefile = cachefile + "." + str(os.getpid())
+        cachefileobj = open(tmp_cachefile, 'w')
+        cachefileobj.write(str(self.get_state()))
+        cachefileobj.write("\t")
+        cachefileobj.write(self.get_message())
+        cachefileobj.flush()
+        cachefileobj.close()
+        os.rename(tmp_cachefile, cachefile)
+        return True
 
     def get_pattern_list(pattern_string, pattern_filename):
         """Get the pattern list."""
@@ -465,6 +559,44 @@ class LogChecker:
         f.close()
         return offset
     read_seekfile = staticmethod(read_seekfile)
+
+    def get_prefix_datafile(seekfile, seekfile_directory, seekfile_tag=''):
+        """Make the prefix of the file name for data files."""
+        direcotry = None
+        if seekfile_directory:
+            directory = seekfile_directory
+        elif seekfile:
+            directory = os.path.dirname(seekfile)
+        filename_elements = []
+        filename_elements.append(LogChecker.PREFIX_DATA)
+        if seekfile_tag:
+            filename_elements.append(".")
+            filename_elements.append(seekfile_tag)
+        filename = "".join(filename_elements)
+        prefix_datafile = os.path.join(directory, filename)
+        return prefix_datafile
+    get_prefix_datafile = staticmethod(get_prefix_datafile)
+
+    def lock(lockfile):
+        """Lock."""
+        lockfileobj = open(lockfile, 'w')
+        signal.signal(signal.SIGALRM, _signal_handler)
+        signal.alarm(LogChecker.RETRY_PERIOD)
+        try:
+            fcntl.flock(lockfileobj, fcntl.LOCK_EX)
+        except IOError:
+            return None
+        signal.alarm(0)
+        lockfileobj.flush()
+        return lockfileobj
+    lock = staticmethod(lock)
+
+    def unlock(lockfile, lockfileobj):
+        """Unlock."""
+        lockfileobj.close()
+        os.unlink(lockfile)
+        return True
+    unlock = staticmethod(unlock)
 
     def get_digest(string):
         """Get digest string."""
@@ -620,6 +752,18 @@ class LogChecker:
                           dest="multiline",
                           default=False,
                           help="Consider multiple lines with same key as one log output. See also --multiline.")
+        parser.add_option("--cache",
+                          action="store_true",
+                          dest="cache",
+                          default=False,
+                          help="Cache the result for the period specified by the option --cachetime.")
+        parser.add_option("--cachetime",
+                          action="store",
+                          type="int",
+                          dest="cachetime",
+                          default=60,
+                          metavar="<seconds>",
+                          help="The period to cache the result. Default is %default.")
         parser.add_option("--debug",
                           action="store_true",
                           dest="debug",
@@ -715,7 +859,9 @@ class LogChecker:
             "trace_inode": options.trace_inode,
             "multiline": options.multiline,
             "scantime": options.scantime,
-            "expiration": options.expiration
+            "expiration": options.expiration,
+            "cache": options.cache,
+            "cachetime": options.cachetime
         }
         return initial_data
     generate_initial_data = staticmethod(generate_initial_data)
@@ -727,28 +873,7 @@ def main():
 
     initial_data = LogChecker.generate_initial_data(options)
     log = LogChecker(initial_data)
-    state = LogChecker.STATE_OK
-
-    # execute check_log_multi or check_log
-    seekfile = None
-    is_multiple_logfiles = LogChecker.is_multiple_logfiles(options.logfile_pattern)
-    if is_multiple_logfiles:
-        log.check_log_multi(options.logfile_pattern, options.seekfile_directory, options.remove_seekfile, options.seekfile_tag)
-        state = log.get_state()
-        print log.get_message()
-    else:
-        # create seekfile
-        if options.seekfile:
-            seekfile = options.seekfile
-        elif options.seekfile_directory:
-            logfile = options.logfile_pattern
-            seekfile = LogChecker.get_seekfile(options.logfile_pattern, options.seekfile_directory, logfile,
-                                               trace_inode=options.trace_inode, seekfile_tag=options.seekfile_tag)
-
-        log.check_log(options.logfile_pattern, seekfile)
-        state = log.get_state()
-        print log.get_message()
-
+    state = log.check(options.logfile_pattern, options.seekfile, options.seekfile_directory, options.remove_seekfile, options.seekfile_tag)
     sys.exit(state)
 
 

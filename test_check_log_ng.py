@@ -64,6 +64,9 @@ class TestSequenceFunctions(unittest.TestCase):
             seekfile = LogChecker.get_seekfile(self.logfile_pattern, self.seekdir, self.logfile, trace_inode=True)
             if os.path.exists(seekfile):
                 os.unlink(seekfile)
+            seekfile = LogChecker.get_seekfile(self.logfile_pattern, self.seekdir, self.logfile, trace_inode=False)
+            if os.path.exists(seekfile):
+                os.unlink(seekfile)
             os.unlink(self.logfile)
 
         if os.path.exists(self.logfile1):
@@ -77,6 +80,15 @@ class TestSequenceFunctions(unittest.TestCase):
             if os.path.exists(seekfile2):
                 os.unlink(seekfile2)
             os.unlink(self.logfile2)
+
+        prefix_datafile = LogChecker.get_prefix_datafile('', self.seekdir)
+        cachefile = "".join([prefix_datafile, LogChecker.SUFFIX_CACHE])
+        lockfile = "".join([prefix_datafile, LogChecker.SUFFIX_LOCK])
+        if os.path.exists(cachefile):
+            os.unlink(cachefile)
+        if os.path.exists(lockfile):
+            os.unlink(lockfile)
+
         if os.path.exists(self.logdir):
             os.removedirs(self.logdir)
         if os.path.exists(self.seekdir):
@@ -1055,6 +1067,156 @@ class TestSequenceFunctions(unittest.TestCase):
         self.assertNotEquals(seekfile_1, seekfile_3)
         self.assertTrue(seekfile_1.find(self.tag1))
         self.assertTrue(os.path.exists(seekfile_3))
+
+    def test_check_without_cache(self):
+        """LogChecker.check()
+        """
+        initial_data = {
+            "logformat": self.logformat_syslog,
+            "pattern_list": ["ERROR"],
+            "critical_pattern_list": [],
+            "negpattern_list": [],
+            "critical_negpattern_list": [],
+            "case_insensitive": False,
+            "warning": 1,
+            "critical": 0,
+            "nodiff_warn": False,
+            "nodiff_crit": False,
+            "trace_inode": False,
+            "multiline": False,
+            "scantime": 86400,
+            "expiration": 691200,
+            "cache": False,
+            "cachetime": 60
+        }
+        log = LogChecker(initial_data)
+
+        # create new logfiles
+        f = open(self.logfile, 'a')
+        f.write("Dec  5 12:34:51 hostname noop: NOOP\n")
+        f.write("Dec  5 12:34:51 hostname test: ERROR\n")
+        f.write("Dec  5 12:34:52 hostname noop: NOOP\n")
+        f.flush()
+        f.close()
+
+        log.check(self.logfile, '', self.seekdir)
+
+        self.assertEqual(log.get_state(), LogChecker.STATE_WARNING)
+        self.assertEqual(log.get_message(), 'WARNING: Found 1 lines (limit=1/0): Dec  5 12:34:51 hostname test: ERROR at %s' % self.logfile)
+
+        log.clear_state()
+        log.check(self.logfile, '', self.seekdir)
+        self.assertEqual(log.get_state(), LogChecker.STATE_OK)
+
+    def test_check_with_cache(self):
+        """--cache --cachetime=60
+        """
+        initial_data = {
+            "logformat": self.logformat_syslog,
+            "pattern_list": ["ERROR"],
+            "critical_pattern_list": [],
+            "negpattern_list": [],
+            "critical_negpattern_list": [],
+            "case_insensitive": False,
+            "warning": 1,
+            "critical": 0,
+            "nodiff_warn": False,
+            "nodiff_crit": False,
+            "trace_inode": False,
+            "multiline": False,
+            "scantime": 86400,
+            "expiration": 691200,
+            "cache": True,
+            "cachetime": 60
+        }
+        log = LogChecker(initial_data)
+
+        # create new logfiles
+        f = open(self.logfile, 'a')
+        f.write("Dec  5 12:34:51 hostname noop: NOOP\n")
+        f.write("Dec  5 12:34:51 hostname test: ERROR\n")
+        f.write("Dec  5 12:34:52 hostname noop: NOOP\n")
+        f.flush()
+        f.close()
+
+        log.check(self.logfile, '', self.seekdir)
+        self.assertEqual(log.get_state(), LogChecker.STATE_WARNING)
+        self.assertEqual(log.get_message(), 'WARNING: Found 1 lines (limit=1/0): Dec  5 12:34:51 hostname test: ERROR at %s' % self.logfile)
+
+        log.clear_state()
+        log.check(self.logfile, '', self.seekdir)
+        self.assertEqual(log.get_state(), LogChecker.STATE_WARNING)
+        self.assertEqual(log.get_message(), 'WARNING: Found 1 lines (limit=1/0): Dec  5 12:34:51 hostname test: ERROR at %s' % self.logfile)
+
+    def test_check_with_expired_cache(self):
+        """--cache --cachetime=1
+        """
+        initial_data = {
+            "logformat": self.logformat_syslog,
+            "pattern_list": ["ERROR"],
+            "critical_pattern_list": [],
+            "negpattern_list": [],
+            "critical_negpattern_list": [],
+            "case_insensitive": False,
+            "warning": 1,
+            "critical": 0,
+            "nodiff_warn": False,
+            "nodiff_crit": False,
+            "trace_inode": False,
+            "multiline": False,
+            "scantime": 86400,
+            "expiration": 691200,
+            "cache": True,
+            "cachetime": 1
+        }
+        log = LogChecker(initial_data)
+
+        # create new logfiles
+        f = open(self.logfile, 'a')
+        f.write("Dec  5 12:34:51 hostname noop: NOOP\n")
+        f.write("Dec  5 12:34:51 hostname test: ERROR\n")
+        f.write("Dec  5 12:34:52 hostname noop: NOOP\n")
+        f.flush()
+        f.close()
+
+        log.check(self.logfile, '', self.seekdir)
+        self.assertEqual(log.get_state(), LogChecker.STATE_WARNING)
+        self.assertEqual(log.get_message(), 'WARNING: Found 1 lines (limit=1/0): Dec  5 12:34:51 hostname test: ERROR at %s' % self.logfile)
+
+        log.clear_state()
+        time.sleep(2)
+        log.check(self.logfile, '', self.seekdir)
+        self.assertEqual(log.get_state(), LogChecker.STATE_OK)
+
+    def test_get_prefix_datafile(self):
+        """LogChecker.get_prefix_datafile()
+        """
+        prefix_datafile = LogChecker.get_prefix_datafile(self.seekfile, '', '')
+        self.assertEqual(prefix_datafile, os.path.join(os.path.dirname(self.seekfile), LogChecker.PREFIX_DATA))
+
+        prefix_datafile = LogChecker.get_prefix_datafile('', self.seekdir, '')
+        self.assertEqual(prefix_datafile, os.path.join(self.seekdir, LogChecker.PREFIX_DATA))
+
+        prefix_datafile = LogChecker.get_prefix_datafile(self.seekfile, self.seekdir, self.tag1)
+        self.assertEqual(prefix_datafile, os.path.join(self.seekdir, "".join([LogChecker.PREFIX_DATA, '.', self.tag1])))
+
+    def test_lock(self):
+        """LogChecker.lock()
+        """
+        prefix_datafile = LogChecker.get_prefix_datafile('', self.seekdir)
+        lockfile = "".join([prefix_datafile, LogChecker.SUFFIX_LOCK])        
+        lockfileobj = LogChecker.lock(lockfile)
+        self.assertIsNotNone(lockfileobj)
+
+    def test_unlock(self):
+        """LogChecker.unlock()
+        """
+        prefix_datafile = LogChecker.get_prefix_datafile('', self.seekdir)
+        lockfile = "".join([prefix_datafile, LogChecker.SUFFIX_LOCK])        
+        lockfileobj = LogChecker.lock(lockfile)
+        LogChecker.unlock(lockfile, lockfileobj)
+        self.assertFalse(os.path.exists(lockfile))
+        self.assertTrue(lockfileobj.closed)
 
 # class TestCommandLineParser(pikzie.TestCase):
 #
