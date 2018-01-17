@@ -5,6 +5,7 @@ from check_log_ng import LogChecker
 import unittest
 import os
 import time
+import subprocess
 # import sys
 # import pikzie
 
@@ -1188,6 +1189,54 @@ class TestSequenceFunctions(unittest.TestCase):
         log.check(self.logfile, '', self.seekdir)
         self.assertEqual(log.get_state(), LogChecker.STATE_OK)
 
+    def test_check_with_lock_timeout(self):
+        """--cache with lock timeout
+        """
+        initial_data = {
+            "logformat": self.logformat_syslog,
+            "pattern_list": ["ERROR"],
+            "critical_pattern_list": [],
+            "negpattern_list": [],
+            "critical_negpattern_list": [],
+            "case_insensitive": False,
+            "warning": 1,
+            "critical": 0,
+            "nodiff_warn": False,
+            "nodiff_crit": False,
+            "trace_inode": False,
+            "multiline": False,
+            "scantime": 86400,
+            "expiration": 691200,
+            "cache": True,
+            "cachetime": 60
+        }
+        log = LogChecker(initial_data)
+
+        # create new logfiles
+        f = open(self.logfile, 'a')
+        f.write("Dec  5 12:34:51 hostname noop: NOOP\n")
+        f.write("Dec  5 12:34:51 hostname test: ERROR\n")
+        f.write("Dec  5 12:34:52 hostname noop: NOOP\n")
+        f.flush()
+        f.close()
+
+        prefix_datafile = LogChecker.get_prefix_datafile('', self.seekdir)
+        lockfile = "".join([prefix_datafile, LogChecker.SUFFIX_LOCK])
+        code = """import time
+from check_log_ng import LogChecker
+lockfile = '%s'
+lockfileobj = LogChecker.lock(lockfile)
+time.sleep(9)
+LogChecker.unlock(lockfile, lockfileobj)
+""" % lockfile
+        code = code.replace("\n", ";")
+        proc = subprocess.Popen(['python', '-c', code])
+        time.sleep(2)
+        log.check(self.logfile, '', self.seekdir)
+        proc.wait()
+        self.assertEqual(log.get_state(), LogChecker.STATE_UNKNOWN)
+        self.assertEqual(log.get_message(), 'UNKNOWN: Another process is executing.')
+
     def test_get_prefix_datafile(self):
         """LogChecker.get_prefix_datafile()
         """
@@ -1206,7 +1255,28 @@ class TestSequenceFunctions(unittest.TestCase):
         prefix_datafile = LogChecker.get_prefix_datafile('', self.seekdir)
         lockfile = "".join([prefix_datafile, LogChecker.SUFFIX_LOCK])        
         lockfileobj = LogChecker.lock(lockfile)
-        self.assertIsNotNone(lockfileobj)
+        self.assertNotEqual(lockfileobj, None)
+
+    def test_lock_timeout(self):
+        """LogChecker.lock() and its time out.
+        """
+        prefix_datafile = LogChecker.get_prefix_datafile('', self.seekdir)
+        lockfile = "".join([prefix_datafile, LogChecker.SUFFIX_LOCK])
+        code = """import time
+from check_log_ng import LogChecker
+lockfile = '%s'
+lockfileobj = LogChecker.lock(lockfile)
+time.sleep(9)
+LogChecker.unlock(lockfile, lockfileobj)
+""" % lockfile
+        code = code.replace("\n", ";")
+        proc = subprocess.Popen(['python', '-c', code])
+        time.sleep(2)
+        lockfileobj = LogChecker.lock(lockfile)
+        proc.wait()
+        self.assertEqual(lockfileobj, None)
+        #self.assertEqual(log.get_state(), LogChecker.STATE_UNKNOWN)
+        #self.assertEqual(log.get_message(), 'UNKNOWN: Another process is executing.')
 
     def test_unlock(self):
         """LogChecker.unlock()

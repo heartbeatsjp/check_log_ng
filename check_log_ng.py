@@ -340,25 +340,22 @@ class LogChecker:
                 if state != LogChecker.STATE_NO_CACHE:
                     self.state = state
                     self.message = message
-                    print self.get_message()
-                    return state
+                    return
                 lockfileobj = LogChecker.lock(lockfile)
                 if lockfileobj:
                     locked = True
                     break
+                curtime = time.time()
             if not locked:
                 self.state = LogChecker.STATE_UNKNOWN
                 self.message = "UNKNOWN: Another process is executing."
-                print self.get_message()
-                return state
+                return
 
         seekfile = None
         is_multiple_logfiles = LogChecker.is_multiple_logfiles(logfile_pattern)
         if is_multiple_logfiles:
             self.check_log_multi(logfile_pattern, seekfile_directory,
                                  remove_seekfile, seekfile_tag)
-            state = self.get_state()
-            print self.get_message()
         else:
             # create seekfile
             if not seekfile and seekfile_directory:
@@ -368,14 +365,11 @@ class LogChecker:
                                                    trace_inode=self.trace_inode,
                                                    seekfile_tag=seekfile_tag)
             self.check_log(logfile_pattern, seekfile)
-            state = self.get_state()
-            print self.get_message()
 
         if self.cache:
             self.update_cache(cachefile)
             LogChecker.unlock(lockfile, lockfileobj)
-
-        return state
+        return
 
     def check_log(self, logfile, seekfile):
         """Check the log file."""
@@ -587,6 +581,8 @@ class LogChecker:
 
     def unlock(lockfile, lockfileobj):
         """Unlock."""
+        if lockfileobj is None:
+            return False
         lockfileobj.close()
         os.unlink(lockfile)
         return True
@@ -867,7 +863,9 @@ def main():
 
     initial_data = LogChecker.generate_initial_data(options)
     log = LogChecker(initial_data)
-    state = log.check(options.logfile_pattern, options.seekfile, options.seekfile_directory, options.remove_seekfile, options.seekfile_tag)
+    log.check(options.logfile_pattern, options.seekfile, options.seekfile_directory, options.remove_seekfile, options.seekfile_tag)
+    state = log.get_state()
+    print log.get_message()
     sys.exit(state)
 
 
