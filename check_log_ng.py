@@ -8,7 +8,6 @@ import time
 import re
 import base64
 import fcntl
-import signal
 from optparse import OptionParser
 
 # Globals
@@ -19,9 +18,6 @@ debug = False
 def _debug(string):
     if debug:
         print "DEBUG: %s" % string
-
-def _signal_handler(signum, frame):
-    raise IOError("Locked.")
 
 class LogChecker:
 
@@ -580,13 +576,11 @@ class LogChecker:
     def lock(lockfile):
         """Lock."""
         lockfileobj = open(lockfile, 'w')
-        signal.signal(signal.SIGALRM, _signal_handler)
-        signal.alarm(LogChecker.RETRY_PERIOD)
         try:
-            fcntl.flock(lockfileobj, fcntl.LOCK_EX)
+            fcntl.flock(lockfileobj, fcntl.LOCK_EX|fcntl.LOCK_NB)
         except IOError:
+            time.sleep(RETRY_PERIOD)
             return None
-        signal.alarm(0)
         lockfileobj.flush()
         return lockfileobj
     lock = staticmethod(lock)
