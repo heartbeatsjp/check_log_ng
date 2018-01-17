@@ -579,7 +579,7 @@ class LogChecker:
         try:
             fcntl.flock(lockfileobj, fcntl.LOCK_EX|fcntl.LOCK_NB)
         except IOError:
-            time.sleep(RETRY_PERIOD)
+            time.sleep(LogChecker.RETRY_PERIOD)
             return None
         lockfileobj.flush()
         return lockfileobj
