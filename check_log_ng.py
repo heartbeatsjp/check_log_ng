@@ -36,8 +36,7 @@ class LogChecker:
     SUFFIX_CACHE = ".cache"
     SUFFIX_LOCK = ".lock"
     PREFIX_DATA = "check_log_ng"
-    LOCK_TIMEOUT = 5
-    RETRY_PERIOD = 1
+    RETRY_PERIOD = 0.5
 
     def __init__(self, initial_data):
         """ Constructor."""
@@ -58,6 +57,7 @@ class LogChecker:
         self.expiration = 691200
         self.cache = False
         self.cachetime = 60
+        self.lock_timeout = 3
 
         # set initial_data
         for key in initial_data:
@@ -328,28 +328,31 @@ class LogChecker:
         """Execute check_log_multi or check_log.
         If cache is enabled and exists, return cache.
         """
+        prefix_datafile = LogChecker.get_prefix_datafile(seekfile, seekfile_directory,
+                                                         seekfile_tag)
         if self.cache:
-            prefix_datafile = LogChecker.get_prefix_datafile(seekfile, seekfile_directory, seekfile_tag)
             cachefile = "".join([prefix_datafile, LogChecker.SUFFIX_CACHE])
-            lockfile = "".join([prefix_datafile, LogChecker.SUFFIX_LOCK])
-            locked = False
-            curtime = time.time()
-            timeout = curtime + LogChecker.LOCK_TIMEOUT
-            while curtime < timeout:
+        lockfile = "".join([prefix_datafile, LogChecker.SUFFIX_LOCK])
+        locked = False
+        cur_time = time.time()
+        timeout_time = cur_time + self.lock_timeout
+        while cur_time < timeout_time:
+            if self.cache:
                 state, message = self.get_cache(cachefile)
                 if state != LogChecker.STATE_NO_CACHE:
                     self.state = state
                     self.message = message
                     return
-                lockfileobj = LogChecker.lock(lockfile)
-                if lockfileobj:
-                    locked = True
-                    break
-                curtime = time.time()
-            if not locked:
-                self.state = LogChecker.STATE_UNKNOWN
-                self.message = "UNKNOWN: Another process is executing."
-                return
+            lockfileobj = LogChecker.lock(lockfile)
+            if lockfileobj:
+                locked = True
+                break
+            cur_time = time.time()
+            time.sleep(LogChecker.RETRY_PERIOD)
+        if not locked:
+            self.state = LogChecker.STATE_UNKNOWN
+            self.message = "UNKNOWN: Lock timeout. Another process is running."
+            return
 
         seekfile = None
         is_multiple_logfiles = LogChecker.is_multiple_logfiles(logfile_pattern)
@@ -368,7 +371,8 @@ class LogChecker:
 
         if self.cache:
             self.update_cache(cachefile)
-            LogChecker.unlock(lockfile, lockfileobj)
+
+        LogChecker.unlock(lockfile, lockfileobj)
         return
 
     def check_log(self, logfile, seekfile):
@@ -573,7 +577,6 @@ class LogChecker:
         try:
             fcntl.flock(lockfileobj, fcntl.LOCK_EX|fcntl.LOCK_NB)
         except IOError:
-            time.sleep(LogChecker.RETRY_PERIOD)
             return None
         lockfileobj.flush()
         return lockfileobj
@@ -754,6 +757,13 @@ class LogChecker:
                           default=60,
                           metavar="<seconds>",
                           help="The period to cache the result. Default is %default.")
+        parser.add_option("--lock-timeout",
+                          action="store",
+                          type="int",
+                          dest="lock_timeout",
+                          default=3,
+                          metavar="<seconds>",
+                          help="If another proccess is running, wait for the period of this lock timeout. Default is %default.")
         parser.add_option("--debug",
                           action="store_true",
                           dest="debug",
@@ -851,7 +861,8 @@ class LogChecker:
             "scantime": options.scantime,
             "expiration": options.expiration,
             "cache": options.cache,
-            "cachetime": options.cachetime
+            "cachetime": options.cachetime,
+            "lock_timeout": options.lock_timeout
         }
         return initial_data
     generate_initial_data = staticmethod(generate_initial_data)
