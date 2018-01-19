@@ -834,7 +834,7 @@ def _check_parser_options(parser):
 
     return (options, args)
 
-def generate_initial_data(options):
+def _generate_initial_data(options):
     """Generate initial data."""
     # make pattern list
     pattern_list = LogChecker.get_pattern_list(options.pattern, options.patternfile)
