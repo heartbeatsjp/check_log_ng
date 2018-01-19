@@ -535,7 +535,7 @@ class LogChecker:
 
     def update_seekfile(seekfile, position):
         """Update the seek file for the log file."""
-        tmp_seekfile = seekfile + "." + str(os.getpid)
+        tmp_seekfile = seekfile + "." + str(os.getpid())
         f = open(tmp_seekfile, 'w')
         f.write(str(position))
         f.flush()
