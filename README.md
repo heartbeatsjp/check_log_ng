@@ -6,7 +6,7 @@ Log file regular expression based parser plugin for Nagios.
 
 ## Installation
 
-Clone a copy of the main check_log_ng git repo and add execute permission.
+Clone a copy of the main `check_log_ng` git repo and add execute permission.
 
 ```
 $ git@github.com:heartbeatsjp/check_log_ng.git
@@ -16,17 +16,17 @@ $ chmod 755 check_log_ng.py
 Copy this plugin to nagios-plugins directory.
 
 ```
-$ cp ./check_log_ng.py /usr/lib64/nagios/plugins/
+$ cp check_log_ng.py /usr/lib64/nagios/plugins/
 ```
 
-Create a directory for saving a seek files and change the owner of the directory.
-
+Create a directory to save a cache file, a lock file and seek files.
+Change the owner of the directory.
 ```
 $ mkdir /var/spool/check_log_ng
 $ chown nrpe:nrpe /var/spool/check_log_ng
 ```
 
-If root privileges is necessary for reading of the logfile, edit the sudoers file.
+If root privilege is necessary to read log files, edit a  sudoers file.
 
 ```
 Defaults:nrpe !requiretty
@@ -120,6 +120,9 @@ Options:
                         option --cachetime.
   --cachetime=<seconds>
                         The period to cache the result. Default is 60.
+  --lock-timeout=<seconds>
+                        If another proccess is running, wait for the period of
+                        this lock timeout. Default is 3.
   --debug               Enable debug.
 ```
 
