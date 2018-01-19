@@ -615,163 +615,6 @@ class LogChecker:
         return digest
     get_digest = staticmethod(get_digest)
 
-    def make_parser():
-        usage = "Usage: %prog [option ...]"
-        version = "%%prog %s" % (CHECK_LOG_NG_VERSION)
-        parser = OptionParser(usage=usage, version=version)
-
-        parser.add_option("-l", "--logfile",
-                          action="store",
-                          dest="logfile_pattern",
-                          metavar="<filename>",
-                          help="The pattern of log files to be scanned. The metacharacter * and ? are allowed. If you want to set multiple patterns, set a space between patterns.")
-        parser.add_option("-F", "--format",
-                          action="store",
-                          dest="logformat",
-                          metavar="<format>",
-                          default=LogChecker.FORMAT_SYSLOG,
-                          help="The regular expression of format of log to parse. Required two group, format of '^(TIMESTAMP and TAG)(.*)$'. Also, may use %%, %Y, %y, %a, %b, %m, %d, %e, %H, %M, %S, %F and %T of strftime(3). Default: the regular expression for syslog.")
-        parser.add_option("-s", "--seekfile",
-                          action="store",
-                          dest="seekfile",
-                          metavar="<filename>",
-                          help="The temporary file to store the seek position of the last scan. If check multiple log files, ignore this option. Use -S seekfile_directory.")
-        parser.add_option("-S", "--seekfile-directory",
-                          action="store",
-                          dest="seekfile_directory",
-                          metavar="<seekfile_directory>",
-                          help="The directory of the temporary file to store the seek position of the last scan. If check multiple log files, require this option.")
-        parser.add_option("-T", "--seekfile-tag",
-                          action="store",
-                          dest="seekfile_tag",
-                          default="",
-                          metavar="<seekfile_tag>",
-                          help="Add a tag in the seek files names, to prevent names collisions. Useful to avoid maintaining many '-S' temporary directories when you check the same files several times with different options.")
-        parser.add_option("-I", "--trace-inode",
-                          action="store_true",
-                          dest="trace_inode",
-                          default=False,
-                          help="Trace the inode of log files. If set, use inode information as a seek file.")
-        parser.add_option("-p", "--pattern",
-                          action="store",
-                          dest="pattern",
-                          metavar="<pattern>",
-                          help="The regular expression to scan for in the log file.")
-        parser.add_option("-P", "--patternfile",
-                          action="store",
-                          dest="patternfile",
-                          metavar="<filename>",
-                          help="File containing regular expressions, one per line.")
-        parser.add_option("--critical-pattern",
-                          action="store",
-                          dest="critical_pattern",
-                          metavar="<pattern>",
-                          help="The regular expression to scan for in the log file. In spite of --critical option, return CRITICAL.")
-        parser.add_option("--critical-patternfile",
-                          action="store",
-                          dest="critical_patternfile",
-                          metavar="<filename>",
-                          help="File containing regular expressions, one per line. In spite of --critical option, return CRITICAL.")
-        parser.add_option("-n", "--negpattern",
-                          action="store",
-                          dest="negpattern",
-                          metavar="<pattern>",
-                          help="The regular expression to skip except as critical pattern in the log file.")
-        parser.add_option("-N", "-f", "--negpatternfile",
-                          action="store",
-                          dest="negpatternfile",
-                          metavar="<filename>",
-                          help="Specifies a file with regular expressions which all will be skipped except as critical pattern, one per line.")
-        parser.add_option("--critical-negpattern",
-                          action="store",
-                          dest="critical_negpattern",
-                          metavar="<pattern>",
-                          help="The regular expression to skip in the log file")
-        parser.add_option("--critical-negpatternfile",
-                          action="store",
-                          dest="critical_negpatternfile",
-                          metavar="<filename>",
-                          help="Specifies a file with regular expressions which all will be skipped, one per line.")
-        parser.add_option("-i", "--case-insensitive",
-                          action="store_true",
-                          dest="case_insensitive",
-                          default=False,
-                          help="Do a case insensitive scan")
-        parser.add_option("-w", "--warning",
-                          action="store",
-                          type="int",
-                          dest="warning",
-                          default=1,
-                          metavar="<number>",
-                          help="Return WARNING if at least this many matches found.  The default is %default.")
-        parser.add_option("-c", "--critical",
-                          action="store",
-                          type="int",
-                          dest="critical",
-                          default=0,
-                          metavar="<number>",
-                          help="Return CRITICAL if at least this many matches found.  The default is %default, i.e. don't return critical alerts unless specified explicitly.")
-        parser.add_option("-d", "--nodiff-warn",
-                          action="store_true",
-                          dest="nodiff_warn",
-                          default=False,
-                          help="Return WARNING if the log file was not written to since the last scan. (not implemented)")
-        parser.add_option("-D", "--nodiff-crit",
-                          action="store_true",
-                          dest="nodiff_crit",
-                          default=False,
-                          help="Return CRITICAL if the log was not written to since the last scan. (not impremented)")
-        parser.add_option("-t", "--scantime",
-                          action="store",
-                          type="int",
-                          dest="scantime",
-                          default=86400,
-                          metavar="<seconds>",
-                          help="The range of time to scan. The log files older than this time are not scanned. Default is %default.")
-        parser.add_option("-E", "--expiration",
-                          action="store",
-                          type="int",
-                          dest="expiration",
-                          default=691200,
-                          metavar="<seconds>",
-                          help="The expiration of seek files. Default is %default. This value must be greater than period of log rotation when use with -R option.")
-        parser.add_option("-R", "--remove-seekfile",
-                          action="store_true",
-                          dest="remove_seekfile",
-                          default=False,
-                          help="Remove expired seek files. See also --expiration.")
-        parser.add_option("-M", "--multiline",
-                          action="store_true",
-                          dest="multiline",
-                          default=False,
-                          help="Consider multiple lines with same key as one log output. See also --multiline.")
-        parser.add_option("--cache",
-                          action="store_true",
-                          dest="cache",
-                          default=False,
-                          help="Cache the result for the period specified by the option --cachetime.")
-        parser.add_option("--cachetime",
-                          action="store",
-                          type="int",
-                          dest="cachetime",
-                          default=60,
-                          metavar="<seconds>",
-                          help="The period to cache the result. Default is %default.")
-        parser.add_option("--lock-timeout",
-                          action="store",
-                          type="int",
-                          dest="lock_timeout",
-                          default=3,
-                          metavar="<seconds>",
-                          help="If another proccess is running, wait for the period of this lock timeout. Default is %default.")
-        parser.add_option("--debug",
-                          action="store_true",
-                          dest="debug",
-                          default=False,
-                          help="Enable debug.")
-        return parser
-    make_parser = staticmethod(make_parser)
-
     def is_multiple_logfiles(pattern):
         m = re.search('[*? ]', pattern)
         if m is not None:
@@ -780,99 +623,253 @@ class LogChecker:
         return False
     is_multiple_logfiles = staticmethod(is_multiple_logfiles)
 
-    def check_parser_options(parser):
-        global debug
-        (options, args) = parser.parse_args()
-        debug = options.debug
+def _make_parser():
+    usage = "Usage: %prog [option ...]"
+    version = "%%prog %s" % (CHECK_LOG_NG_VERSION)
+    parser = OptionParser(usage=usage, version=version)
 
-        if len(sys.argv) == 1:
-            parser.print_help()
+    parser.add_option("-l", "--logfile",
+                      action="store",
+                      dest="logfile_pattern",
+                      metavar="<filename>",
+                      help="The pattern of log files to be scanned. The metacharacter * and ? are allowed. If you want to set multiple patterns, set a space between patterns.")
+    parser.add_option("-F", "--format",
+                      action="store",
+                      dest="logformat",
+                      metavar="<format>",
+                      default=LogChecker.FORMAT_SYSLOG,
+                      help="The regular expression of format of log to parse. Required two group, format of '^(TIMESTAMP and TAG)(.*)$'. Also, may use %%, %Y, %y, %a, %b, %m, %d, %e, %H, %M, %S, %F and %T of strftime(3). Default: the regular expression for syslog.")
+    parser.add_option("-s", "--seekfile",
+                      action="store",
+                      dest="seekfile",
+                      metavar="<filename>",
+                      help="The temporary file to store the seek position of the last scan. If check multiple log files, ignore this option. Use -S seekfile_directory.")
+    parser.add_option("-S", "--seekfile-directory",
+                      action="store",
+                      dest="seekfile_directory",
+                      metavar="<seekfile_directory>",
+                      help="The directory of the temporary file to store the seek position of the last scan. If check multiple log files, require this option.")
+    parser.add_option("-T", "--seekfile-tag",
+                      action="store",
+                      dest="seekfile_tag",
+                      default="",
+                      metavar="<seekfile_tag>",
+                      help="Add a tag in the seek files names, to prevent names collisions. Useful to avoid maintaining many '-S' temporary directories when you check the same files several times with different options.")
+    parser.add_option("-I", "--trace-inode",
+                      action="store_true",
+                      dest="trace_inode",
+                      default=False,
+                      help="Trace the inode of log files. If set, use inode information as a seek file.")
+    parser.add_option("-p", "--pattern",
+                      action="store",
+                      dest="pattern",
+                      metavar="<pattern>",
+                      help="The regular expression to scan for in the log file.")
+    parser.add_option("-P", "--patternfile",
+                      action="store",
+                      dest="patternfile",
+                      metavar="<filename>",
+                      help="File containing regular expressions, one per line.")
+    parser.add_option("--critical-pattern",
+                      action="store",
+                      dest="critical_pattern",
+                      metavar="<pattern>",
+                      help="The regular expression to scan for in the log file. In spite of --critical option, return CRITICAL.")
+    parser.add_option("--critical-patternfile",
+                      action="store",
+                      dest="critical_patternfile",
+                      metavar="<filename>",
+                      help="File containing regular expressions, one per line. In spite of --critical option, return CRITICAL.")
+    parser.add_option("-n", "--negpattern",
+                      action="store",
+                      dest="negpattern",
+                      metavar="<pattern>",
+                      help="The regular expression to skip except as critical pattern in the log file.")
+    parser.add_option("-N", "-f", "--negpatternfile",
+                      action="store",
+                      dest="negpatternfile",
+                      metavar="<filename>",
+                      help="Specifies a file with regular expressions which all will be skipped except as critical pattern, one per line.")
+    parser.add_option("--critical-negpattern",
+                      action="store",
+                      dest="critical_negpattern",
+                      metavar="<pattern>",
+                      help="The regular expression to skip in the log file")
+    parser.add_option("--critical-negpatternfile",
+                      action="store",
+                      dest="critical_negpatternfile",
+                      metavar="<filename>",
+                      help="Specifies a file with regular expressions which all will be skipped, one per line.")
+    parser.add_option("-i", "--case-insensitive",
+                      action="store_true",
+                      dest="case_insensitive",
+                      default=False,
+                      help="Do a case insensitive scan")
+    parser.add_option("-w", "--warning",
+                      action="store",
+                      type="int",
+                      dest="warning",
+                      default=1,
+                      metavar="<number>",
+                      help="Return WARNING if at least this many matches found.  The default is %default.")
+    parser.add_option("-c", "--critical",
+                      action="store",
+                      type="int",
+                      dest="critical",
+                      default=0,
+                      metavar="<number>",
+                      help="Return CRITICAL if at least this many matches found.  The default is %default, i.e. don't return critical alerts unless specified explicitly.")
+    parser.add_option("-d", "--nodiff-warn",
+                      action="store_true",
+                      dest="nodiff_warn",
+                      default=False,
+                      help="Return WARNING if the log file was not written to since the last scan. (not implemented)")
+    parser.add_option("-D", "--nodiff-crit",
+                      action="store_true",
+                      dest="nodiff_crit",
+                      default=False,
+                      help="Return CRITICAL if the log was not written to since the last scan. (not impremented)")
+    parser.add_option("-t", "--scantime",
+                      action="store",
+                      type="int",
+                      dest="scantime",
+                      default=86400,
+                      metavar="<seconds>",
+                      help="The range of time to scan. The log files older than this time are not scanned. Default is %default.")
+    parser.add_option("-E", "--expiration",
+                      action="store",
+                      type="int",
+                      dest="expiration",
+                      default=691200,
+                      metavar="<seconds>",
+                      help="The expiration of seek files. Default is %default. This value must be greater than period of log rotation when use with -R option.")
+    parser.add_option("-R", "--remove-seekfile",
+                      action="store_true",
+                      dest="remove_seekfile",
+                      default=False,
+                      help="Remove expired seek files. See also --expiration.")
+    parser.add_option("-M", "--multiline",
+                      action="store_true",
+                      dest="multiline",
+                      default=False,
+                      help="Consider multiple lines with same key as one log output. See also --multiline.")
+    parser.add_option("--cache",
+                      action="store_true",
+                      dest="cache",
+                      default=False,
+                      help="Cache the result for the period specified by the option --cachetime.")
+    parser.add_option("--cachetime",
+                      action="store",
+                      type="int",
+                      dest="cachetime",
+                      default=60,
+                      metavar="<seconds>",
+                      help="The period to cache the result. Default is %default.")
+    parser.add_option("--lock-timeout",
+                      action="store",
+                      type="int",
+                      dest="lock_timeout",
+                      default=3,
+                      metavar="<seconds>",
+                      help="If another proccess is running, wait for the period of this lock timeout. Default is %default.")
+    parser.add_option("--debug",
+                      action="store_true",
+                      dest="debug",
+                      default=False,
+                      help="Enable debug.")
+    return parser
+
+def _check_parser_options(parser):
+    global debug
+    (options, args) = parser.parse_args()
+    debug = options.debug
+
+    if len(sys.argv) == 1:
+        parser.print_help()
+        sys.exit(LogChecker.STATE_UNKNOWN)
+
+    # check args
+    if options.logfile_pattern is None or options.logfile_pattern is '':
+        parser.error("option -l, --logfile is required.")
+        sys.exit(LogChecker.STATE_UNKNOWN)
+    if options.seekfile and options.seekfile_directory:
+        parser.error("options '-s, --seekfile' and '-S, --seekfile-directory' are incompatible.\
+                If check multiple log files, Use -S. If check single log file, Use -s or -S.")
+        sys.exit(LogChecker.STATE_UNKNOWN)
+
+    is_multiple_logfiles = LogChecker.is_multiple_logfiles(options.logfile_pattern)
+    if is_multiple_logfiles:
+        if options.seekfile:
+            parser.error("If check multiple log files, options -s, --seekfile cannot be specified.")
+            sys.exit(LogChecker.STATE_UNKNOWN)
+        if options.seekfile_directory is None or options.seekfile_directory is '':
+            parser.error("If check multiple log files, option -S, --seekfile-directory is required.")
+            sys.exit(LogChecker.STATE_UNKNOWN)
+        if ((options.seekfile is None or options.seekfile is '') and
+                (options.seekfile_directory is None or options.seekfile_directory is '')):
+            parser.error("options '-S, --seekfile-directory' is required.")
+            sys.exit(LogChecker.STATE_UNKNOWN)
+        # check directory
+        if (options.seekfile_directory) and not os.path.isdir(options.seekfile_directory):
+            parser.error("seekfile directory is not found: %s" % (options.seekfile_directory))
+            sys.exit(LogChecker.STATE_UNKNOWN)
+    else:
+        if ((options.seekfile is None or options.seekfile is '') and
+                (options.seekfile_directory is None or options.seekfile_directory is '')):
+            parser.error("options '-S, --seekfile-directory' or '-s, --seekfile' is required.")
+            sys.exit(LogChecker.STATE_UNKNOWN)
+        # check file or directory
+        if options.seekfile_directory and not os.path.isdir(options.seekfile_directory):
+            parser.error("seekfile directory is not found: %s" % (options.seekfile_directory))
+            sys.exit(LogChecker.STATE_UNKNOWN)
+        if options.seekfile and not os.path.isfile(options.logfile_pattern):
+            parser.error("logfile is not found: %s" % (options.logfile_pattern))
             sys.exit(LogChecker.STATE_UNKNOWN)
 
-        # check args
-        if options.logfile_pattern is None or options.logfile_pattern is '':
-            parser.error("option -l, --logfile is required.")
-            sys.exit(LogChecker.STATE_UNKNOWN)
-        if options.seekfile and options.seekfile_directory:
-            parser.error("options '-s, --seekfile' and '-S, --seekfile-directory' are incompatible.\
-                    If check multiple log files, Use -S. If check single log file, Use -s or -S.")
-            sys.exit(LogChecker.STATE_UNKNOWN)
+    pattern_list = LogChecker.get_pattern_list(options.pattern, options.patternfile)
+    critical_pattern_list = LogChecker.get_pattern_list(options.critical_pattern, options.critical_patternfile)
+    if len(pattern_list) == 0 and len(critical_pattern_list) == 0:
+        parser.error("any valid pattern not found")
+        sys.exit(LogChecker.STATE_UNKNOWN)
 
-        is_multiple_logfiles = LogChecker.is_multiple_logfiles(options.logfile_pattern)
-        if is_multiple_logfiles:
-            if options.seekfile:
-                parser.error("If check multiple log files, options -s, --seekfile cannot be specified.")
-                sys.exit(LogChecker.STATE_UNKNOWN)
-            if options.seekfile_directory is None or options.seekfile_directory is '':
-                parser.error("If check multiple log files, option -S, --seekfile-directory is required.")
-                sys.exit(LogChecker.STATE_UNKNOWN)
-            if ((options.seekfile is None or options.seekfile is '') and
-                    (options.seekfile_directory is None or options.seekfile_directory is '')):
-                parser.error("options '-S, --seekfile-directory' is required.")
-                sys.exit(LogChecker.STATE_UNKNOWN)
-            # check directory
-            if (options.seekfile_directory) and not os.path.isdir(options.seekfile_directory):
-                parser.error("seekfile directory is not found: %s" % (options.seekfile_directory))
-                sys.exit(LogChecker.STATE_UNKNOWN)
-        else:
-            if ((options.seekfile is None or options.seekfile is '') and
-                    (options.seekfile_directory is None or options.seekfile_directory is '')):
-                parser.error("options '-S, --seekfile-directory' or '-s, --seekfile' is required.")
-                sys.exit(LogChecker.STATE_UNKNOWN)
-            # check file or directory
-            if options.seekfile_directory and not os.path.isdir(options.seekfile_directory):
-                parser.error("seekfile directory is not found: %s" % (options.seekfile_directory))
-                sys.exit(LogChecker.STATE_UNKNOWN)
-            if options.seekfile and not os.path.isfile(options.logfile_pattern):
-                parser.error("logfile is not found: %s" % (options.logfile_pattern))
-                sys.exit(LogChecker.STATE_UNKNOWN)
+    return (options, args)
 
-        pattern_list = LogChecker.get_pattern_list(options.pattern, options.patternfile)
-        critical_pattern_list = LogChecker.get_pattern_list(options.critical_pattern, options.critical_patternfile)
-        if len(pattern_list) == 0 and len(critical_pattern_list) == 0:
-            parser.error("any valid pattern not found")
-            sys.exit(LogChecker.STATE_UNKNOWN)
+def generate_initial_data(options):
+    """Generate initial data."""
+    # make pattern list
+    pattern_list = LogChecker.get_pattern_list(options.pattern, options.patternfile)
+    critical_pattern_list = LogChecker.get_pattern_list(options.critical_pattern, options.critical_patternfile)
+    negpattern_list = LogChecker.get_pattern_list(options.negpattern, options.negpatternfile)
+    critical_negpattern_list = LogChecker.get_pattern_list(options.critical_negpattern, options.critical_negpatternfile)
 
-        return (options, args)
-    check_parser_options = staticmethod(check_parser_options)
-
-    def generate_initial_data(options):
-        """Generate initial data."""
-        # make pattern list
-        pattern_list = LogChecker.get_pattern_list(options.pattern, options.patternfile)
-        critical_pattern_list = LogChecker.get_pattern_list(options.critical_pattern, options.critical_patternfile)
-        negpattern_list = LogChecker.get_pattern_list(options.negpattern, options.negpatternfile)
-        critical_negpattern_list = LogChecker.get_pattern_list(options.critical_negpattern, options.critical_negpatternfile)
-
-        # set value of options
-        initial_data = {
-            "logformat": options.logformat,
-            "pattern_list": pattern_list,
-            "critical_pattern_list": critical_pattern_list,
-            "negpattern_list": negpattern_list,
-            "critical_negpattern_list": critical_negpattern_list,
-            "case_insensitive": options.case_insensitive,
-            "warning": options.warning,
-            "critical": options.critical,
-            "nodiff_warn": options.nodiff_warn,
-            "nodiff_crit": options.nodiff_crit,
-            "trace_inode": options.trace_inode,
-            "multiline": options.multiline,
-            "scantime": options.scantime,
-            "expiration": options.expiration,
-            "cache": options.cache,
-            "cachetime": options.cachetime,
-            "lock_timeout": options.lock_timeout
-        }
-        return initial_data
-    generate_initial_data = staticmethod(generate_initial_data)
+    # set value of options
+    initial_data = {
+        "logformat": options.logformat,
+        "pattern_list": pattern_list,
+        "critical_pattern_list": critical_pattern_list,
+        "negpattern_list": negpattern_list,
+        "critical_negpattern_list": critical_negpattern_list,
+        "case_insensitive": options.case_insensitive,
+        "warning": options.warning,
+        "critical": options.critical,
+        "nodiff_warn": options.nodiff_warn,
+        "nodiff_crit": options.nodiff_crit,
+        "trace_inode": options.trace_inode,
+        "multiline": options.multiline,
+        "scantime": options.scantime,
+        "expiration": options.expiration,
+        "cache": options.cache,
+        "cachetime": options.cachetime,
+        "lock_timeout": options.lock_timeout
+    }
+    return initial_data
 
 
 def main():
-    parser = LogChecker.make_parser()
-    (options, args) = LogChecker.check_parser_options(parser)
+    parser = _make_parser()
+    (options, args) = _check_parser_options(parser)
 
-    initial_data = LogChecker.generate_initial_data(options)
+    initial_data = _generate_initial_data(options)
     log = LogChecker(initial_data)
     log.check(options.logfile_pattern, options.seekfile, options.seekfile_directory, options.remove_seekfile, options.seekfile_tag)
     state = log.get_state()
