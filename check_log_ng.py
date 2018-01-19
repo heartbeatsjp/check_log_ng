@@ -39,8 +39,8 @@ class LogChecker:
         self.logformat = LogChecker.FORMAT_SYSLOG
         self.pattern_list = []
         self.critical_pattern_list = []
-        self.negative_pattern_list = []
-        self.critical_negative_pattern_list = []
+        self.negpattern_list = []
+        self.critical_negpattern_list = []
         self.case_insensitive = False
         self.warning = 1
         self.critical = 0
@@ -78,7 +78,7 @@ class LogChecker:
 
         return True
 
-    def _check_negative_pattern(self, line):
+    def _check_negpattern(self, line):
         """Check whether the line matches negative pattern.
 
            If matched, return True.
@@ -94,7 +94,7 @@ class LogChecker:
                 return True
         return False
 
-    def _check_critical_negative_pattern(self, line):
+    def _check_critical_negpattern(self, line):
         """Check whether the line matches critical negative pattern.
 
            If matched, return True.
@@ -246,10 +246,10 @@ class LogChecker:
 
     def _set_found(self, message, found, critical_found):
         """Set the found and critical_found if matching pattern is found."""
-        if (not self._check_negative_pattern(message)) and (not self._check_critical_negative_pattern(message)):
+        if (not self._check_negpattern(message)) and (not self._check_critical_negpattern(message)):
             if self._find_pattern(message):
                 found.append(message)
-        if not self._check_critical_negative_pattern(message):
+        if not self._check_critical_negpattern(message):
             if self._find_critical_pattern(message):
                 critical_found.append(message)
         return
