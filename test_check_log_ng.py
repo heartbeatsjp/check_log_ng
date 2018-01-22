@@ -228,6 +228,40 @@ class TestSequenceFunctions(unittest.TestCase):
         self.assertEqual(log.get_state(), LogChecker.STATE_WARNING)
         self.assertEqual(log.get_message(), 'WARNING: Found 1 lines (limit=1/0): Dec  5 12:34:56 hostname test: ERROR at %s' % self.logfile)
 
+    def test_pattern_with_encoding(self):
+        """--pattern and --encoding
+        """
+        initial_data = {
+            "logformat": self.logformat_syslog,
+            "pattern_list": ["エラー"],
+            "critical_pattern_list": [],
+            "negpattern_list": [],
+            "critical_negpattern_list": [],
+            "case_insensitive": False,
+            "encoding": 'EUC-JP',
+            "warning": 1,
+            "critical": 0,
+            "nodiff_warn": False,
+            "nodiff_crit": False,
+            "trace_inode": False,
+            "multiline": False,
+            "scantime": 86400,
+            "expiration": 691200
+        }
+        log = LogChecker(initial_data)
+
+        f = open(self.logfile, 'a')
+        f.write("Dec  5 12:34:56 hostname noop: NOOP\n")
+        f.write(u"Dec  5 12:34:56 hostname test: エラー\n".encode("EUC-JP"))
+        f.write("Dec  5 12:34:57 hostname noop: NOOP\n")
+        f.flush()
+        f.close()
+
+        log.check_log(self.logfile, self.seekfile)
+
+        self.assertEqual(log.get_state(), LogChecker.STATE_WARNING)
+        self.assertEqual(log.get_message(), 'WARNING: Found 1 lines (limit=1/0): Dec  5 12:34:56 hostname test: エラー at %s' % self.logfile)
+
     def test_criticalpattern(self):
         """--criticalpattern option
         """
