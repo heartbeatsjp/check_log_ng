@@ -94,6 +94,9 @@ Options:
                         will be skipped, one per line.
   -i, --case-insensitive
                         Do a case insensitive scan
+  --encoding=<encoding>
+                        Specify the character encoding in the log file. If not
+                        specified, it is treated as it is.
   -w <number>, --warning=<number>
                         Return WARNING if at least this many matches found.
                         The default is 1.
@@ -126,6 +129,10 @@ Options:
   --debug               Enable debug.
 ```
 
+### Note
+
+The --encoding option is supported in Python 2.6 or higher.
+
 ## Contributing
 
 If you have a problem, please [create an issue](https://github.com/heartbeatsjp/check_log_ng/issues) or a pull request.
@@ -142,6 +149,5 @@ If you have a problem, please [create an issue](https://github.com/heartbeatsjp/
 
 ## Todo
 
-- handling character encodings
 - support python 3
 - improve the current test code coverage

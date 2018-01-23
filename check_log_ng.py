@@ -47,6 +47,7 @@ class LogChecker:
         self.negpattern_list = []
         self.critical_negpattern_list = []
         self.case_insensitive = False
+        self.encoding = None
         self.warning = 1
         self.critical = 0
         self.nodiff_warn = False
@@ -254,6 +255,8 @@ class LogChecker:
 
     def _set_found(self, message, found, critical_found):
         """Set the found and critical_found if matching pattern is found."""
+        if self.encoding:
+            message = message.decode(self.encoding, errors='replace').encode('utf-8')
         if (not self._check_negpattern(message)) and (not self._check_critical_negpattern(message)):
             if self._find_pattern(message):
                 found.append(message)
@@ -705,6 +708,12 @@ def _make_parser():
                       dest="case_insensitive",
                       default=False,
                       help="Do a case insensitive scan")
+    parser.add_option("--encoding",
+                      action="store",
+                      dest="encoding",
+                      default=None,
+                      metavar="<encoding>",
+                      help="Specify the character encoding in the log file. If not specified, it is treated as it is.")
     parser.add_option("-w", "--warning",
                       action="store",
                       type="int",
@@ -850,6 +859,7 @@ def _generate_initial_data(options):
         "negpattern_list": negpattern_list,
         "critical_negpattern_list": critical_negpattern_list,
         "case_insensitive": options.case_insensitive,
+        "encoding": options.encoding,
         "warning": options.warning,
         "critical": options.critical,
         "nodiff_warn": options.nodiff_warn,
