@@ -1,16 +1,17 @@
 #!/usr/bin/env python
-# coding: utf-8
+# -*- coding: utf-8 -*-
+"""Unit test for check_log_ng"""
 
-from check_log_ng import LogChecker
 import unittest
 import os
 import time
 import subprocess
-# import sys
-# import pikzie
+from check_log_ng import LogChecker
 
 
 class TestSequenceFunctions(unittest.TestCase):
+
+    """Unit test."""
 
     def setUp(self):
         curdir = os.getcwd()
@@ -36,12 +37,18 @@ class TestSequenceFunctions(unittest.TestCase):
             os.mkdir(seekdir)
         self.seekdir = seekdir
         self.seekfile = os.path.join(seekdir, 'testlog.seek')
-        self.seekfile1 = LogChecker.get_seekfile(self.logfile_pattern, seekdir, self.logfile1)
-        self.seekfile2 = LogChecker.get_seekfile(self.logfile_pattern, seekdir, self.logfile2)
-        self.seekfile3 = LogChecker.get_seekfile(self.logfile_pattern, seekdir, self.logfile, seekfile_tag=self.tag1)
-        self.seekfile4 = LogChecker.get_seekfile(self.logfile_pattern, seekdir, self.logfile, seekfile_tag=self.tag2)
-        self.seekfile5 = LogChecker.get_seekfile(self.logfile_pattern, seekdir, self.logfile1, seekfile_tag=self.tag2)
-        self.seekfile6 = LogChecker.get_seekfile(self.logfile_pattern, seekdir, self.logfile2, seekfile_tag=self.tag2)
+        self.seekfile1 = LogChecker.get_seekfile(
+            self.logfile_pattern, seekdir, self.logfile1)
+        self.seekfile2 = LogChecker.get_seekfile(
+            self.logfile_pattern, seekdir, self.logfile2)
+        self.seekfile3 = LogChecker.get_seekfile(
+            self.logfile_pattern, seekdir, self.logfile, seekfile_tag=self.tag1)
+        self.seekfile4 = LogChecker.get_seekfile(
+            self.logfile_pattern, seekdir, self.logfile, seekfile_tag=self.tag2)
+        self.seekfile5 = LogChecker.get_seekfile(
+            self.logfile_pattern, seekdir, self.logfile1, seekfile_tag=self.tag2)
+        self.seekfile6 = LogChecker.get_seekfile(
+            self.logfile_pattern, seekdir, self.logfile2, seekfile_tag=self.tag2)
 
         self.logformat_syslog = LogChecker.FORMAT_SYSLOG
 
@@ -62,22 +69,26 @@ class TestSequenceFunctions(unittest.TestCase):
             os.unlink(self.seekfile6)
 
         if os.path.exists(self.logfile):
-            seekfile = LogChecker.get_seekfile(self.logfile_pattern, self.seekdir, self.logfile, trace_inode=True)
+            seekfile = LogChecker.get_seekfile(
+                self.logfile_pattern, self.seekdir, self.logfile, trace_inode=True)
             if os.path.exists(seekfile):
                 os.unlink(seekfile)
-            seekfile = LogChecker.get_seekfile(self.logfile_pattern, self.seekdir, self.logfile, trace_inode=False)
+            seekfile = LogChecker.get_seekfile(
+                self.logfile_pattern, self.seekdir, self.logfile, trace_inode=False)
             if os.path.exists(seekfile):
                 os.unlink(seekfile)
             os.unlink(self.logfile)
 
         if os.path.exists(self.logfile1):
-            seekfile1 = LogChecker.get_seekfile(self.logfile_pattern, self.seekdir, self.logfile1, trace_inode=True)
+            seekfile1 = LogChecker.get_seekfile(
+                self.logfile_pattern, self.seekdir, self.logfile1, trace_inode=True)
             if os.path.exists(seekfile1):
                 os.unlink(seekfile1)
             os.unlink(self.logfile1)
 
         if os.path.exists(self.logfile2):
-            seekfile2 = LogChecker.get_seekfile(self.logfile_pattern, self.seekdir, self.logfile2, trace_inode=True)
+            seekfile2 = LogChecker.get_seekfile(
+                self.logfile_pattern, self.seekdir, self.logfile2, trace_inode=True)
             if os.path.exists(seekfile2):
                 os.unlink(seekfile2)
             os.unlink(self.logfile2)
@@ -101,7 +112,7 @@ class TestSequenceFunctions(unittest.TestCase):
         """--format option
         """
         initial_data = {
-            "logformat": "^(\[%a %b %d %T %Y\] \[\S+\]) (.*)$",
+            "logformat": r"^(\[%a %b %d %T %Y\] \[\S+\]) (.*)$",
             "pattern_list": ["ERROR"],
             "critical_pattern_list": [],
             "negpattern_list": [],
@@ -118,12 +129,12 @@ class TestSequenceFunctions(unittest.TestCase):
         }
         log = LogChecker(initial_data)
 
-        f = open(self.logfile, 'a')
-        f.write("[Thu Dec 05 12:34:56 2013] [error] NOOP\n")
-        f.write("[Thu Dec 05 12:34:56 2013] [error] ERROR\n")
-        f.write("[Thu Dec 05 12:34:57 2013] [error] NOOP\n")
-        f.flush()
-        f.close()
+        fileobj = open(self.logfile, 'a')
+        fileobj.write("[Thu Dec 05 12:34:56 2013] [error] NOOP\n")
+        fileobj.write("[Thu Dec 05 12:34:56 2013] [error] ERROR\n")
+        fileobj.write("[Thu Dec 05 12:34:57 2013] [error] NOOP\n")
+        fileobj.flush()
+        fileobj.close()
 
         log.check_log(self.logfile, self.seekfile)
 
@@ -151,12 +162,12 @@ class TestSequenceFunctions(unittest.TestCase):
         }
         log = LogChecker(initial_data)
 
-        f = open(self.logfile, 'a')
-        f.write("Dec  5 12:34:56 hostname noop: NOOP\n")
-        f.write("Dec  5 12:34:56 hostname test: ERROR\n")
-        f.write("Dec  5 12:34:57 hostname noop: NOOP\n")
-        f.flush()
-        f.close()
+        fileobj = open(self.logfile, 'a')
+        fileobj.write("Dec  5 12:34:56 hostname noop: NOOP\n")
+        fileobj.write("Dec  5 12:34:56 hostname test: ERROR\n")
+        fileobj.write("Dec  5 12:34:57 hostname noop: NOOP\n")
+        fileobj.flush()
+        fileobj.close()
 
         log.check_log(self.logfile, self.seekfile)
 
@@ -184,11 +195,11 @@ class TestSequenceFunctions(unittest.TestCase):
         }
         log = LogChecker(initial_data)
 
-        f = open(self.logfile, 'a')
-        f.write("Dec  5 12:34:56 hostname noop: NOOP\n")
-        f.write("Dec  5 12:34:57 hostname noop: NOOP\n")
-        f.flush()
-        f.close()
+        fileobj = open(self.logfile, 'a')
+        fileobj.write("Dec  5 12:34:56 hostname noop: NOOP\n")
+        fileobj.write("Dec  5 12:34:57 hostname noop: NOOP\n")
+        fileobj.flush()
+        fileobj.close()
 
         log.check_log(self.logfile, self.seekfile)
 
@@ -216,12 +227,12 @@ class TestSequenceFunctions(unittest.TestCase):
         }
         log = LogChecker(initial_data)
 
-        f = open(self.logfile, 'a')
-        f.write("Dec  5 12:34:56 hostname noop: NOOP\n")
-        f.write("Dec  5 12:34:56 hostname test: ERROR\n")
-        f.write("Dec  5 12:34:57 hostname noop: NOOP\n")
-        f.flush()
-        f.close()
+        fileobj = open(self.logfile, 'a')
+        fileobj.write("Dec  5 12:34:56 hostname noop: NOOP\n")
+        fileobj.write("Dec  5 12:34:56 hostname test: ERROR\n")
+        fileobj.write("Dec  5 12:34:57 hostname noop: NOOP\n")
+        fileobj.flush()
+        fileobj.close()
 
         log.check_log(self.logfile, self.seekfile)
 
@@ -249,12 +260,12 @@ class TestSequenceFunctions(unittest.TestCase):
         }
         log = LogChecker(initial_data)
 
-        f = open(self.logfile, 'a')
-        f.write("Dec  5 12:34:56 hostname noop: NOOP\n")
-        f.write("Dec  5 12:34:56 hostname test: ERROR\n")
-        f.write("Dec  5 12:34:57 hostname noop: NOOP\n")
-        f.flush()
-        f.close()
+        fileobj = open(self.logfile, 'a')
+        fileobj.write("Dec  5 12:34:56 hostname noop: NOOP\n")
+        fileobj.write("Dec  5 12:34:56 hostname test: ERROR\n")
+        fileobj.write("Dec  5 12:34:57 hostname noop: NOOP\n")
+        fileobj.flush()
+        fileobj.close()
 
         log.check_log(self.logfile, self.seekfile)
 
@@ -282,12 +293,12 @@ class TestSequenceFunctions(unittest.TestCase):
         }
         log = LogChecker(initial_data)
 
-        f = open(self.logfile, 'a')
-        f.write("Dec  5 12:34:56 hostname noop: NOOP\n")
-        f.write("Dec  5 12:34:56 hostname test: ERROR IGNORE\n")
-        f.write("Dec  5 12:34:57 hostname noop: NOOP\n")
-        f.flush()
-        f.close()
+        fileobj = open(self.logfile, 'a')
+        fileobj.write("Dec  5 12:34:56 hostname noop: NOOP\n")
+        fileobj.write("Dec  5 12:34:56 hostname test: ERROR IGNORE\n")
+        fileobj.write("Dec  5 12:34:57 hostname noop: NOOP\n")
+        fileobj.flush()
+        fileobj.close()
 
         log.check_log(self.logfile, self.seekfile)
 
@@ -315,12 +326,12 @@ class TestSequenceFunctions(unittest.TestCase):
         }
         log = LogChecker(initial_data)
 
-        f = open(self.logfile, 'a')
-        f.write("Dec  5 12:34:56 hostname noop: NOOP\n")
-        f.write("Dec  5 12:34:56 hostname test: ERROR\n")
-        f.write("Dec  5 12:34:57 hostname noop: NOOP\n")
-        f.flush()
-        f.close()
+        fileobj = open(self.logfile, 'a')
+        fileobj.write("Dec  5 12:34:56 hostname noop: NOOP\n")
+        fileobj.write("Dec  5 12:34:56 hostname test: ERROR\n")
+        fileobj.write("Dec  5 12:34:57 hostname noop: NOOP\n")
+        fileobj.flush()
+        fileobj.close()
 
         log.check_log(self.logfile, self.seekfile)
 
@@ -348,12 +359,12 @@ class TestSequenceFunctions(unittest.TestCase):
         }
         log = LogChecker(initial_data)
 
-        f = open(self.logfile, 'a')
-        f.write("Dec  5 12:34:56 hostname noop: NOOP\n")
-        f.write("Dec  5 12:34:56 hostname test: ERROR IGNORE\n")
-        f.write("Dec  5 12:34:57 hostname noop: NOOP\n")
-        f.flush()
-        f.close()
+        fileobj = open(self.logfile, 'a')
+        fileobj.write("Dec  5 12:34:56 hostname noop: NOOP\n")
+        fileobj.write("Dec  5 12:34:56 hostname test: ERROR IGNORE\n")
+        fileobj.write("Dec  5 12:34:57 hostname noop: NOOP\n")
+        fileobj.flush()
+        fileobj.close()
 
         log.check_log(self.logfile, self.seekfile)
 
@@ -381,12 +392,12 @@ class TestSequenceFunctions(unittest.TestCase):
         }
         log = LogChecker(initial_data)
 
-        f = open(self.logfile, 'a')
-        f.write("Dec  5 12:34:56 hostname noop: NOOP\n")
-        f.write("Dec  5 12:34:56 hostname test: FATAL ERROR IGNORE\n")
-        f.write("Dec  5 12:34:57 hostname noop: NOOP\n")
-        f.flush()
-        f.close()
+        fileobj = open(self.logfile, 'a')
+        fileobj.write("Dec  5 12:34:56 hostname noop: NOOP\n")
+        fileobj.write("Dec  5 12:34:56 hostname test: FATAL ERROR IGNORE\n")
+        fileobj.write("Dec  5 12:34:57 hostname noop: NOOP\n")
+        fileobj.flush()
+        fileobj.close()
 
         log.check_log(self.logfile, self.seekfile)
 
@@ -414,12 +425,12 @@ class TestSequenceFunctions(unittest.TestCase):
         }
         log = LogChecker(initial_data)
 
-        f = open(self.logfile, 'a')
-        f.write("Dec  5 12:34:56 hostname noop: NOOP\n")
-        f.write("Dec  5 12:34:56 hostname test: IGNORE FATAL\n")
-        f.write("Dec  5 12:34:57 hostname noop: NOOP\n")
-        f.flush()
-        f.close()
+        fileobj = open(self.logfile, 'a')
+        fileobj.write("Dec  5 12:34:56 hostname noop: NOOP\n")
+        fileobj.write("Dec  5 12:34:56 hostname test: IGNORE FATAL\n")
+        fileobj.write("Dec  5 12:34:57 hostname noop: NOOP\n")
+        fileobj.flush()
+        fileobj.close()
 
         log.check_log(self.logfile, self.seekfile)
 
@@ -447,12 +458,12 @@ class TestSequenceFunctions(unittest.TestCase):
         }
         log = LogChecker(initial_data)
 
-        f = open(self.logfile, 'a')
-        f.write("Dec  5 12:34:56 hostname noop: NOOP\n")
-        f.write("Dec  5 12:34:56 hostname test: ERROR IGNORE FATAL\n")
-        f.write("Dec  5 12:34:57 hostname noop: NOOP\n")
-        f.flush()
-        f.close()
+        fileobj = open(self.logfile, 'a')
+        fileobj.write("Dec  5 12:34:56 hostname noop: NOOP\n")
+        fileobj.write("Dec  5 12:34:56 hostname test: ERROR IGNORE FATAL\n")
+        fileobj.write("Dec  5 12:34:57 hostname noop: NOOP\n")
+        fileobj.flush()
+        fileobj.close()
 
         log.check_log(self.logfile, self.seekfile)
 
@@ -480,12 +491,12 @@ class TestSequenceFunctions(unittest.TestCase):
         }
         log = LogChecker(initial_data)
 
-        f = open(self.logfile, 'a')
-        f.write("Dec  5 12:34:56 hostname noop: NOOP\n")
-        f.write("Dec  5 12:34:56 hostname test: ERROR IGNORE\n")
-        f.write("Dec  5 12:34:57 hostname noop: NOOP\n")
-        f.flush()
-        f.close()
+        fileobj = open(self.logfile, 'a')
+        fileobj.write("Dec  5 12:34:56 hostname noop: NOOP\n")
+        fileobj.write("Dec  5 12:34:56 hostname test: ERROR IGNORE\n")
+        fileobj.write("Dec  5 12:34:57 hostname noop: NOOP\n")
+        fileobj.flush()
+        fileobj.close()
 
         log.check_log(self.logfile, self.seekfile)
 
@@ -513,13 +524,13 @@ class TestSequenceFunctions(unittest.TestCase):
         }
         log = LogChecker(initial_data)
 
-        f = open(self.logfile, 'a')
-        f.write("Dec  5 12:34:56 hostname noop: NOOP\n")
-        f.write("Dec  5 12:34:56 hostname test: ERROR1\n")
-        f.write("Dec  5 12:34:56 hostname test: ERROR2\n")
-        f.write("Dec  5 12:34:57 hostname noop: NOOP\n")
-        f.flush()
-        f.close()
+        fileobj = open(self.logfile, 'a')
+        fileobj.write("Dec  5 12:34:56 hostname noop: NOOP\n")
+        fileobj.write("Dec  5 12:34:56 hostname test: ERROR1\n")
+        fileobj.write("Dec  5 12:34:56 hostname test: ERROR2\n")
+        fileobj.write("Dec  5 12:34:57 hostname noop: NOOP\n")
+        fileobj.flush()
+        fileobj.close()
 
         log.check_log(self.logfile, self.seekfile)
 
@@ -547,11 +558,11 @@ class TestSequenceFunctions(unittest.TestCase):
         }
         log = LogChecker(initial_data)
 
-        f = open(self.logfile, 'a')
-        f.write("Dec  5 12:34:56 hostname test: ERROR\n")
-        f.write("Dec  5 12:34:56 hostname test: ERROR IGNORE\n")
-        f.flush()
-        f.close()
+        fileobj = open(self.logfile, 'a')
+        fileobj.write("Dec  5 12:34:56 hostname test: ERROR\n")
+        fileobj.write("Dec  5 12:34:56 hostname test: ERROR IGNORE\n")
+        fileobj.flush()
+        fileobj.close()
 
         log.check_log(self.logfile, self.seekfile)
 
@@ -579,21 +590,21 @@ class TestSequenceFunctions(unittest.TestCase):
         }
         log = LogChecker(initial_data)
 
-        f = open(self.logfile1, 'a')
-        f.write("Dec  5 12:34:56 hostname noop: NOOP\n")
-        f.write("Dec  5 12:34:56 hostname test: ERROR\n")
-        f.write("Dec  5 12:34:57 hostname noop: NOOP\n")
-        f.flush()
-        f.close()
+        fileobj = open(self.logfile1, 'a')
+        fileobj.write("Dec  5 12:34:56 hostname noop: NOOP\n")
+        fileobj.write("Dec  5 12:34:56 hostname test: ERROR\n")
+        fileobj.write("Dec  5 12:34:57 hostname noop: NOOP\n")
+        fileobj.flush()
+        fileobj.close()
 
         time.sleep(1)
 
-        f = open(self.logfile2, 'a')
-        f.write("Dec  5 12:34:58 hostname noop: NOOP\n")
-        f.write("Dec  5 12:34:59 hostname test: ERROR\n")
-        f.write("Dec  5 12:34:59 hostname noop: NOOP\n")
-        f.flush()
-        f.close()
+        fileobj = open(self.logfile2, 'a')
+        fileobj.write("Dec  5 12:34:58 hostname noop: NOOP\n")
+        fileobj.write("Dec  5 12:34:59 hostname test: ERROR\n")
+        fileobj.write("Dec  5 12:34:59 hostname noop: NOOP\n")
+        fileobj.flush()
+        fileobj.close()
 
         log.check_log_multi(self.logfile_pattern, self.seekdir, remove_seekfile=False)
 
@@ -621,21 +632,21 @@ class TestSequenceFunctions(unittest.TestCase):
         }
         log = LogChecker(initial_data)
 
-        f = open(self.logfile1, 'a')
-        f.write("Dec  5 12:34:56 hostname noop: NOOP\n")
-        f.write("Dec  5 12:34:56 hostname test: ERROR\n")
-        f.write("Dec  5 12:34:57 hostname noop: NOOP\n")
-        f.flush()
-        f.close()
+        fileobj = open(self.logfile1, 'a')
+        fileobj.write("Dec  5 12:34:56 hostname noop: NOOP\n")
+        fileobj.write("Dec  5 12:34:56 hostname test: ERROR\n")
+        fileobj.write("Dec  5 12:34:57 hostname noop: NOOP\n")
+        fileobj.flush()
+        fileobj.close()
 
         time.sleep(1)
 
-        f = open(self.logfile2, 'a')
-        f.write("Dec  5 12:34:58 hostname noop: NOOP\n")
-        f.write("Dec  5 12:34:59 hostname test: ERROR\n")
-        f.write("Dec  5 12:34:59 hostname noop: NOOP\n")
-        f.flush()
-        f.close()
+        fileobj = open(self.logfile2, 'a')
+        fileobj.write("Dec  5 12:34:58 hostname noop: NOOP\n")
+        fileobj.write("Dec  5 12:34:59 hostname test: ERROR\n")
+        fileobj.write("Dec  5 12:34:59 hostname noop: NOOP\n")
+        fileobj.flush()
+        fileobj.close()
 
         logfile_pattern = "%s %s" % (self.logfile1, self.logfile2)
         log.check_log_multi(logfile_pattern, self.seekdir, remove_seekfile=False)
@@ -664,12 +675,12 @@ class TestSequenceFunctions(unittest.TestCase):
         }
         log = LogChecker(initial_data)
 
-        f = open(self.logfile1, 'a')
-        f.write("Dec  5 12:34:56 hostname noop: NOOP\n")
-        f.write("Dec  5 12:34:56 hostname test: ERROR\n")
-        f.write("Dec  5 12:34:57 hostname noop: NOOP\n")
-        f.flush()
-        f.close()
+        fileobj = open(self.logfile1, 'a')
+        fileobj.write("Dec  5 12:34:56 hostname noop: NOOP\n")
+        fileobj.write("Dec  5 12:34:56 hostname test: ERROR\n")
+        fileobj.write("Dec  5 12:34:57 hostname noop: NOOP\n")
+        fileobj.flush()
+        fileobj.close()
 
         time.sleep(4)
         log.check_log_multi(self.logfile_pattern, self.seekdir, remove_seekfile=False)
@@ -698,12 +709,12 @@ class TestSequenceFunctions(unittest.TestCase):
         }
         log = LogChecker(initial_data)
 
-        f = open(self.logfile1, 'a')
-        f.write("Dec  5 12:34:58 hostname noop: NOOP\n")
-        f.write("Dec  5 12:34:59 hostname test: ERROR\n")
-        f.write("Dec  5 12:34:59 hostname noop: NOOP\n")
-        f.flush()
-        f.close()
+        fileobj = open(self.logfile1, 'a')
+        fileobj.write("Dec  5 12:34:58 hostname noop: NOOP\n")
+        fileobj.write("Dec  5 12:34:59 hostname test: ERROR\n")
+        fileobj.write("Dec  5 12:34:59 hostname noop: NOOP\n")
+        fileobj.flush()
+        fileobj.close()
 
         # The first ERROR message should be older than scantime. Therefore, don't scan it.
         log.check_log_multi(self.logfile_pattern, self.seekdir, remove_seekfile=False)
@@ -732,21 +743,21 @@ class TestSequenceFunctions(unittest.TestCase):
         }
         log = LogChecker(initial_data)
 
-        f = open(self.logfile1, 'a')
-        f.write("Dec  5 12:34:56 hostname noop: NOOP\n")
-        f.write("Dec  5 12:34:56 hostname test: ERROR\n")
-        f.write("Dec  5 12:34:57 hostname noop: NOOP\n")
-        f.flush()
-        f.close()
+        fileobj = open(self.logfile1, 'a')
+        fileobj.write("Dec  5 12:34:56 hostname noop: NOOP\n")
+        fileobj.write("Dec  5 12:34:56 hostname test: ERROR\n")
+        fileobj.write("Dec  5 12:34:57 hostname noop: NOOP\n")
+        fileobj.flush()
+        fileobj.close()
 
         time.sleep(4)
 
-        f = open(self.logfile2, 'a')
-        f.write("Dec  5 12:34:58 hostname noop: NOOP\n")
-        f.write("Dec  5 12:34:59 hostname test: ERROR\n")
-        f.write("Dec  5 12:34:59 hostname noop: NOOP\n")
-        f.flush()
-        f.close()
+        fileobj = open(self.logfile2, 'a')
+        fileobj.write("Dec  5 12:34:58 hostname noop: NOOP\n")
+        fileobj.write("Dec  5 12:34:59 hostname test: ERROR\n")
+        fileobj.write("Dec  5 12:34:59 hostname noop: NOOP\n")
+        fileobj.flush()
+        fileobj.close()
 
         # logfile1 should be older than timespan. Therefore, don't scan it.
         log.check_log_multi(self.logfile_pattern, self.seekdir, remove_seekfile=False)
@@ -775,23 +786,23 @@ class TestSequenceFunctions(unittest.TestCase):
         }
         log = LogChecker(initial_data)
 
-        f = open(self.logfile1, 'a')
-        f.write("Dec  5 12:34:56 hostname noop: NOOP\n")
-        f.write("Dec  5 12:34:56 hostname test: ERROR\n")
-        f.write("Dec  5 12:34:57 hostname noop: NOOP\n")
-        f.flush()
-        f.close()
+        fileobj = open(self.logfile1, 'a')
+        fileobj.write("Dec  5 12:34:56 hostname noop: NOOP\n")
+        fileobj.write("Dec  5 12:34:56 hostname test: ERROR\n")
+        fileobj.write("Dec  5 12:34:57 hostname noop: NOOP\n")
+        fileobj.flush()
+        fileobj.close()
 
         log.check_log_multi(self.logfile_pattern, self.seekdir, remove_seekfile=True)
         log.clear_state()
         time.sleep(4)
 
-        f = open(self.logfile2, 'a')
-        f.write("Dec  5 12:34:58 hostname noop: NOOP\n")
-        f.write("Dec  5 12:34:59 hostname test: ERROR\n")
-        f.write("Dec  5 12:34:59 hostname noop: NOOP\n")
-        f.flush()
-        f.close()
+        fileobj = open(self.logfile2, 'a')
+        fileobj.write("Dec  5 12:34:58 hostname noop: NOOP\n")
+        fileobj.write("Dec  5 12:34:59 hostname test: ERROR\n")
+        fileobj.write("Dec  5 12:34:59 hostname noop: NOOP\n")
+        fileobj.flush()
+        fileobj.close()
 
         # seek file of logfile1 should be purged.
         log.check_log_multi(self.logfile_pattern, self.seekdir, remove_seekfile=True)
@@ -822,23 +833,23 @@ class TestSequenceFunctions(unittest.TestCase):
         }
         log = LogChecker(initial_data)
 
-        f = open(self.logfile1, 'a')
-        f.write("Dec  5 12:34:56 hostname noop: NOOP\n")
-        f.write("Dec  5 12:34:56 hostname test: ERROR\n")
-        f.write("Dec  5 12:34:57 hostname noop: NOOP\n")
-        f.flush()
-        f.close()
+        fileobj = open(self.logfile1, 'a')
+        fileobj.write("Dec  5 12:34:56 hostname noop: NOOP\n")
+        fileobj.write("Dec  5 12:34:56 hostname test: ERROR\n")
+        fileobj.write("Dec  5 12:34:57 hostname noop: NOOP\n")
+        fileobj.flush()
+        fileobj.close()
 
         log.check_log_multi(self.logfile_pattern, self.seekdir, remove_seekfile=True)
         log.clear_state()
         time.sleep(4)
 
-        f = open(self.logfile2, 'a')
-        f.write("Dec  5 12:34:58 hostname noop: NOOP\n")
-        f.write("Dec  5 12:34:59 hostname test: ERROR\n")
-        f.write("Dec  5 12:34:59 hostname noop: NOOP\n")
-        f.flush()
-        f.close()
+        fileobj = open(self.logfile2, 'a')
+        fileobj.write("Dec  5 12:34:58 hostname noop: NOOP\n")
+        fileobj.write("Dec  5 12:34:59 hostname test: ERROR\n")
+        fileobj.write("Dec  5 12:34:59 hostname noop: NOOP\n")
+        fileobj.flush()
+        fileobj.close()
 
         # seek file of logfile1 should be purged.
         log.check_log_multi(self.logfile_pattern, self.seekdir, remove_seekfile=True)
@@ -870,39 +881,42 @@ class TestSequenceFunctions(unittest.TestCase):
         log = LogChecker(initial_data)
 
         # create logfile
-        f = open(self.logfile, 'a')
-        f.write("Dec  5 12:34:51 hostname noop: NOOP\n")
-        f.write("Dec  5 12:34:51 hostname test: ERROR\n")
-        f.write("Dec  5 12:34:52 hostname noop: NOOP\n")
-        f.flush()
-        f.close()
+        fileobj = open(self.logfile, 'a')
+        fileobj.write("Dec  5 12:34:51 hostname noop: NOOP\n")
+        fileobj.write("Dec  5 12:34:51 hostname test: ERROR\n")
+        fileobj.write("Dec  5 12:34:52 hostname noop: NOOP\n")
+        fileobj.flush()
+        fileobj.close()
 
         # create seekfile of logfile
         log.check_log_multi(self.logfile_pattern, self.seekdir, remove_seekfile=False)
         log.clear_state()
-        seekfile_1 = LogChecker.get_seekfile(self.logfile_pattern, self.seekdir, self.logfile, trace_inode=True)
+        seekfile_1 = LogChecker.get_seekfile(
+            self.logfile_pattern, self.seekdir, self.logfile, trace_inode=True)
 
         # update logfile
-        f = open(self.logfile, 'a')
-        f.write("Dec  5 12:34:55 hostname noop: NOOP\n")
-        f.write("Dec  5 12:34:55 hostname test: ERROR\n")
-        f.write("Dec  5 12:34:56 hostname noop: NOOP\n")
-        f.flush()
-        f.close()
+        fileobj = open(self.logfile, 'a')
+        fileobj.write("Dec  5 12:34:55 hostname noop: NOOP\n")
+        fileobj.write("Dec  5 12:34:55 hostname test: ERROR\n")
+        fileobj.write("Dec  5 12:34:56 hostname noop: NOOP\n")
+        fileobj.flush()
+        fileobj.close()
 
         # log rotation
         os.rename(self.logfile, self.logfile1)
 
         # create a new logfile
-        f = open(self.logfile, 'a')
-        f.write("Dec  5 12:34:59 hostname noop: NOOP\n")
-        f.flush()
-        f.close()
+        fileobj = open(self.logfile, 'a')
+        fileobj.write("Dec  5 12:34:59 hostname noop: NOOP\n")
+        fileobj.flush()
+        fileobj.close()
 
         # create seekfile of logfile
         log.check_log_multi(self.logfile_pattern, self.seekdir, remove_seekfile=False)
-        seekfile_2 = LogChecker.get_seekfile(self.logfile_pattern, self.seekdir, self.logfile, trace_inode=True)
-        seekfile1_2 = LogChecker.get_seekfile(self.logfile_pattern, self.seekdir, self.logfile1, trace_inode=True)
+        seekfile_2 = LogChecker.get_seekfile(
+            self.logfile_pattern, self.seekdir, self.logfile, trace_inode=True)
+        seekfile1_2 = LogChecker.get_seekfile(
+            self.logfile_pattern, self.seekdir, self.logfile1, trace_inode=True)
 
         self.assertEqual(log.get_state(), LogChecker.STATE_WARNING)
         self.assertEqual(log.get_message(), 'WARNING: Found 1 lines (limit=1/0): Dec  5 12:34:55 hostname test: ERROR at %s' % self.logfile1)
@@ -932,38 +946,40 @@ class TestSequenceFunctions(unittest.TestCase):
         log = LogChecker(initial_data)
 
         # create logfile
-        f = open(self.logfile, 'a')
-        f.write("Dec  5 12:34:50 hostname noop: NOOP\n")
-        f.write("Dec  5 12:34:51 hostname test: ERROR\n")
-        f.write("Dec  5 12:34:52 hostname noop: NOOP\n")
-        f.flush()
-        f.close()
+        fileobj = open(self.logfile, 'a')
+        fileobj.write("Dec  5 12:34:50 hostname noop: NOOP\n")
+        fileobj.write("Dec  5 12:34:51 hostname test: ERROR\n")
+        fileobj.write("Dec  5 12:34:52 hostname noop: NOOP\n")
+        fileobj.flush()
+        fileobj.close()
 
         # log rotation
         os.rename(self.logfile, self.logfile1)
 
         # create new logfile
-        f = open(self.logfile, 'a')
-        f.write("Dec  5 12:34:53 hostname noop: NOOP\n")
-        f.write("Dec  5 12:34:53 hostname test: ERROR\n")
-        f.write("Dec  5 12:34:54 hostname noop: NOOP\n")
-        f.flush()
-        f.close()
+        fileobj = open(self.logfile, 'a')
+        fileobj.write("Dec  5 12:34:53 hostname noop: NOOP\n")
+        fileobj.write("Dec  5 12:34:53 hostname test: ERROR\n")
+        fileobj.write("Dec  5 12:34:54 hostname noop: NOOP\n")
+        fileobj.flush()
+        fileobj.close()
 
         # do check_log_multi, and create seekfile and seekfile1
         log.check_log_multi(self.logfile_pattern, self.seekdir, remove_seekfile=True)
         log.clear_state()
-        seekfile_1 = LogChecker.get_seekfile(self.logfile_pattern, self.seekdir, self.logfile, trace_inode=True)
-        seekfile1_1 = LogChecker.get_seekfile(self.logfile_pattern, self.seekdir, self.logfile1, trace_inode=True)
+        seekfile_1 = LogChecker.get_seekfile(
+            self.logfile_pattern, self.seekdir, self.logfile, trace_inode=True)
+        seekfile1_1 = LogChecker.get_seekfile(
+            self.logfile_pattern, self.seekdir, self.logfile1, trace_inode=True)
         time.sleep(4)
 
         # update logfile
-        f = open(self.logfile, 'a')
-        f.write("Dec  5 12:34:58 hostname noop: NOOP\n")
-        f.write("Dec  5 12:34:59 hostname test: ERROR\n")
-        f.write("Dec  5 12:34:59 hostname noop: NOOP\n")
-        f.flush()
-        f.close()
+        fileobj = open(self.logfile, 'a')
+        fileobj.write("Dec  5 12:34:58 hostname noop: NOOP\n")
+        fileobj.write("Dec  5 12:34:59 hostname test: ERROR\n")
+        fileobj.write("Dec  5 12:34:59 hostname noop: NOOP\n")
+        fileobj.flush()
+        fileobj.close()
 
         # log rotation, purge old logfile2
         os.rename(self.logfile1, self.logfile2)
@@ -971,7 +987,8 @@ class TestSequenceFunctions(unittest.TestCase):
 
         # seek file of old logfile1 should be purged.
         log.check_log_multi(self.logfile_pattern, self.seekdir, remove_seekfile=True)
-        seekfile1_2 = LogChecker.get_seekfile(self.logfile_pattern, self.seekdir, self.logfile1, trace_inode=True)
+        seekfile1_2 = LogChecker.get_seekfile(
+            self.logfile_pattern, self.seekdir, self.logfile1, trace_inode=True)
 
         self.assertEqual(log.get_state(), LogChecker.STATE_WARNING)
         self.assertEqual(log.get_message(), 'WARNING: Found 1 lines (limit=1/0): Dec  5 12:34:59 hostname test: ERROR at %s' % self.logfile1)
@@ -1000,12 +1017,12 @@ class TestSequenceFunctions(unittest.TestCase):
         }
         log = LogChecker(initial_data)
 
-        f = open(self.logfile, 'a')
-        f.write("Dec | 5 12:34:56 hostname noop: NOOP\n")
-        f.write("Dec | 5 12:34:56 hostname test: ERROR\n")
-        f.write("Dec | 5 12:34:57 hostname noop: NOOP\n")
-        f.flush()
-        f.close()
+        fileobj = open(self.logfile, 'a')
+        fileobj.write("Dec | 5 12:34:56 hostname noop: NOOP\n")
+        fileobj.write("Dec | 5 12:34:56 hostname test: ERROR\n")
+        fileobj.write("Dec | 5 12:34:57 hostname noop: NOOP\n")
+        fileobj.flush()
+        fileobj.close()
 
         log.check_log(self.logfile, self.seekfile)
 
@@ -1034,30 +1051,33 @@ class TestSequenceFunctions(unittest.TestCase):
         log = LogChecker(initial_data)
 
         # create new logfiles
-        f = open(self.logfile, 'a')
-        f.write("Dec  5 12:34:51 hostname noop: NOOP\n")
-        f.write("Dec  5 12:34:51 hostname test: ERROR\n")
-        f.write("Dec  5 12:34:52 hostname noop: NOOP\n")
-        f.flush()
-        f.close()
+        fileobj = open(self.logfile, 'a')
+        fileobj.write("Dec  5 12:34:51 hostname noop: NOOP\n")
+        fileobj.write("Dec  5 12:34:51 hostname test: ERROR\n")
+        fileobj.write("Dec  5 12:34:52 hostname noop: NOOP\n")
+        fileobj.flush()
+        fileobj.close()
 
-        f = open(self.logfile1, 'a')
-        f.write("Dec  5 12:34:56 hostname noop: NOOP\n")
-        f.write("Dec  5 12:34:56 hostname test: ERROR\n")
-        f.write("Dec  5 12:34:57 hostname noop: NOOP\n")
-        f.flush()
-        f.close()
+        fileobj = open(self.logfile1, 'a')
+        fileobj.write("Dec  5 12:34:56 hostname noop: NOOP\n")
+        fileobj.write("Dec  5 12:34:56 hostname test: ERROR\n")
+        fileobj.write("Dec  5 12:34:57 hostname noop: NOOP\n")
+        fileobj.flush()
+        fileobj.close()
 
-        f = open(self.logfile2, 'a')
-        f.write("Dec  5 12:34:58 hostname noop: NOOP\n")
-        f.write("Dec  5 12:34:59 hostname noop: NOOP\n")
-        f.flush()
-        f.close()
+        fileobj = open(self.logfile2, 'a')
+        fileobj.write("Dec  5 12:34:58 hostname noop: NOOP\n")
+        fileobj.write("Dec  5 12:34:59 hostname noop: NOOP\n")
+        fileobj.flush()
+        fileobj.close()
 
         # create seekfile of logfile
-        seekfile_1 = LogChecker.get_seekfile(self.logfile_pattern, self.seekdir, self.logfile, seekfile_tag=self.tag1)
-        seekfile_2 = LogChecker.get_seekfile(self.logfile_pattern, self.seekdir, self.logfile, seekfile_tag=self.tag1)
-        seekfile_3 = LogChecker.get_seekfile(self.logfile_pattern, self.seekdir, self.logfile, seekfile_tag=self.tag2)
+        seekfile_1 = LogChecker.get_seekfile(
+            self.logfile_pattern, self.seekdir, self.logfile, seekfile_tag=self.tag1)
+        seekfile_2 = LogChecker.get_seekfile(
+            self.logfile_pattern, self.seekdir, self.logfile, seekfile_tag=self.tag1)
+        seekfile_3 = LogChecker.get_seekfile(
+            self.logfile_pattern, self.seekdir, self.logfile, seekfile_tag=self.tag2)
         log.check_log(self.logfile, seekfile_3)
         log.clear_state()
         log.check_log_multi(self.logfile_pattern, self.seekdir, seekfile_tag=self.tag2)
@@ -1065,7 +1085,7 @@ class TestSequenceFunctions(unittest.TestCase):
         self.assertEqual(log.get_state(), LogChecker.STATE_WARNING)
         self.assertEqual(log.get_message(), 'WARNING: Found 1 lines (limit=1/0): Dec  5 12:34:56 hostname test: ERROR at %s' % self.logfile1)
         self.assertEqual(seekfile_1, seekfile_2)
-        self.assertNotEquals(seekfile_1, seekfile_3)
+        self.assertNotEqual(seekfile_1, seekfile_3)
         self.assertTrue(seekfile_1.find(self.tag1))
         self.assertTrue(os.path.exists(seekfile_3))
 
@@ -1093,12 +1113,12 @@ class TestSequenceFunctions(unittest.TestCase):
         log = LogChecker(initial_data)
 
         # create new logfiles
-        f = open(self.logfile, 'a')
-        f.write("Dec  5 12:34:51 hostname noop: NOOP\n")
-        f.write("Dec  5 12:34:51 hostname test: ERROR\n")
-        f.write("Dec  5 12:34:52 hostname noop: NOOP\n")
-        f.flush()
-        f.close()
+        fileobj = open(self.logfile, 'a')
+        fileobj.write("Dec  5 12:34:51 hostname noop: NOOP\n")
+        fileobj.write("Dec  5 12:34:51 hostname test: ERROR\n")
+        fileobj.write("Dec  5 12:34:52 hostname noop: NOOP\n")
+        fileobj.flush()
+        fileobj.close()
 
         log.check(self.logfile, '', self.seekdir)
 
@@ -1133,12 +1153,12 @@ class TestSequenceFunctions(unittest.TestCase):
         log = LogChecker(initial_data)
 
         # create new logfiles
-        f = open(self.logfile, 'a')
-        f.write("Dec  5 12:34:51 hostname noop: NOOP\n")
-        f.write("Dec  5 12:34:51 hostname test: ERROR\n")
-        f.write("Dec  5 12:34:52 hostname noop: NOOP\n")
-        f.flush()
-        f.close()
+        fileobj = open(self.logfile, 'a')
+        fileobj.write("Dec  5 12:34:51 hostname noop: NOOP\n")
+        fileobj.write("Dec  5 12:34:51 hostname test: ERROR\n")
+        fileobj.write("Dec  5 12:34:52 hostname noop: NOOP\n")
+        fileobj.flush()
+        fileobj.close()
 
         log.check(self.logfile, '', self.seekdir)
         self.assertEqual(log.get_state(), LogChecker.STATE_WARNING)
@@ -1173,12 +1193,12 @@ class TestSequenceFunctions(unittest.TestCase):
         log = LogChecker(initial_data)
 
         # create new logfiles
-        f = open(self.logfile, 'a')
-        f.write("Dec  5 12:34:51 hostname noop: NOOP\n")
-        f.write("Dec  5 12:34:51 hostname test: ERROR\n")
-        f.write("Dec  5 12:34:52 hostname noop: NOOP\n")
-        f.flush()
-        f.close()
+        fileobj = open(self.logfile, 'a')
+        fileobj.write("Dec  5 12:34:51 hostname noop: NOOP\n")
+        fileobj.write("Dec  5 12:34:51 hostname test: ERROR\n")
+        fileobj.write("Dec  5 12:34:52 hostname noop: NOOP\n")
+        fileobj.flush()
+        fileobj.close()
 
         log.check(self.logfile, '', self.seekdir)
         self.assertEqual(log.get_state(), LogChecker.STATE_WARNING)
@@ -1214,12 +1234,12 @@ class TestSequenceFunctions(unittest.TestCase):
         log = LogChecker(initial_data)
 
         # create new logfiles
-        f = open(self.logfile, 'a')
-        f.write("Dec  5 12:34:51 hostname noop: NOOP\n")
-        f.write("Dec  5 12:34:51 hostname test: ERROR\n")
-        f.write("Dec  5 12:34:52 hostname noop: NOOP\n")
-        f.flush()
-        f.close()
+        fileobj = open(self.logfile, 'a')
+        fileobj.write("Dec  5 12:34:51 hostname noop: NOOP\n")
+        fileobj.write("Dec  5 12:34:51 hostname test: ERROR\n")
+        fileobj.write("Dec  5 12:34:52 hostname noop: NOOP\n")
+        fileobj.flush()
+        fileobj.close()
 
         prefix_datafile = LogChecker.get_prefix_datafile('', self.seekdir)
         lockfile = "".join([prefix_datafile, LogChecker.SUFFIX_LOCK])
@@ -1263,12 +1283,12 @@ LogChecker.unlock(lockfile, lockfileobj)
         log = LogChecker(initial_data)
 
         # create new logfiles
-        f = open(self.logfile, 'a')
-        f.write("Dec  5 12:34:51 hostname noop: NOOP\n")
-        f.write("Dec  5 12:34:51 hostname test: ERROR\n")
-        f.write("Dec  5 12:34:52 hostname noop: NOOP\n")
-        f.flush()
-        f.close()
+        fileobj = open(self.logfile, 'a')
+        fileobj.write("Dec  5 12:34:51 hostname noop: NOOP\n")
+        fileobj.write("Dec  5 12:34:51 hostname test: ERROR\n")
+        fileobj.write("Dec  5 12:34:52 hostname noop: NOOP\n")
+        fileobj.flush()
+        fileobj.close()
 
         prefix_datafile = LogChecker.get_prefix_datafile('', self.seekdir)
         lockfile = "".join([prefix_datafile, LogChecker.SUFFIX_LOCK])
@@ -1303,7 +1323,7 @@ LogChecker.unlock(lockfile, lockfileobj)
         """LogChecker.lock()
         """
         prefix_datafile = LogChecker.get_prefix_datafile('', self.seekdir)
-        lockfile = "".join([prefix_datafile, LogChecker.SUFFIX_LOCK])        
+        lockfile = "".join([prefix_datafile, LogChecker.SUFFIX_LOCK])
         lockfileobj = LogChecker.lock(lockfile)
         self.assertNotEqual(lockfileobj, None)
 
@@ -1330,74 +1350,11 @@ LogChecker.unlock(lockfile, lockfileobj)
         """LogChecker.unlock()
         """
         prefix_datafile = LogChecker.get_prefix_datafile('', self.seekdir)
-        lockfile = "".join([prefix_datafile, LogChecker.SUFFIX_LOCK])        
+        lockfile = "".join([prefix_datafile, LogChecker.SUFFIX_LOCK])
         lockfileobj = LogChecker.lock(lockfile)
         LogChecker.unlock(lockfile, lockfileobj)
         self.assertFalse(os.path.exists(lockfile))
         self.assertTrue(lockfileobj.closed)
-
-# class TestCommandLineParser(pikzie.TestCase):
-#
-#     def setup(self):
-#         curdir = os.getcwd()
-#         testdir = os.path.join(curdir, 'test')
-#         if not os.path.isdir(testdir):
-#             os.mkdir(testdir)
-#
-#         logdir = os.path.join(testdir, 'log')
-#         if not os.path.isdir(logdir):
-#             os.mkdir(logdir)
-#         self.logfile = os.path.join(logdir, 'testlog')
-#         self.logfile1 = os.path.join(logdir, 'testlog.1')
-#         self.logfile2 = os.path.join(logdir, 'testlog.2')
-#         self.logfile_pattern = os.path.join(logdir, 'testlog*')
-#
-#         seekdir = os.path.join(testdir, 'seek')
-#         if not os.path.isdir(seekdir):
-#             os.mkdir(seekdir)
-#         self.seekdir = seekdir
-#         self.seekfile = os.path.join(seekdir, 'testlog.seek')
-#         self.seekfile1 = LogChecker.get_seekfile(self.logfile_pattern, seekdir, self.logfile1)
-#         self.seekfile2 = LogChecker.get_seekfile(self.logfile_pattern, seekdir, self.logfile2)
-#
-#         self.logformat_syslog = LogChecker.FORMAT_SYSLOG
-#
-#     def teardown(self):
-#         if os.path.exists(self.seekfile):
-#             os.unlink(self.seekfile)
-#         if os.path.exists(self.seekfile1):
-#             os.unlink(self.seekfile1)
-#         if os.path.exists(self.seekfile2):
-#             os.unlink(self.seekfile2)
-#
-#         if os.path.exists(self.logfile):
-#             seekfile = LogChecker.get_seekfile(self.logfile_pattern, self.seekdir, self.logfile, trace_inode=True)
-#             if os.path.exists(seekfile):
-#                 os.unlink(seekfile)
-#             os.unlink(self.logfile)
-#
-#         if os.path.exists(self.logfile1):
-#             seekfile1 = LogChecker.get_seekfile(self.logfile_pattern, self.seekdir, self.logfile1, trace_inode=True)
-#             if os.path.exists(seekfile1):
-#                 os.unlink(seekfile1)
-#             os.unlink(self.logfile1)
-#
-#         if os.path.exists(self.logfile2):
-#             seekfile2 = LogChecker.get_seekfile(self.logfile_pattern, self.seekdir, self.logfile2, trace_inode=True)
-#             if os.path.exists(seekfile2):
-#                 os.unlink(seekfile2)
-#             os.unlink(self.logfile2)
-
-#     @pikzie.data("from01", ["prog", "-l", "hogehoge", "-s", "hogehoge", "hogehoge", "-S", "0", "-j"])
-#     def test_error_true(self, argv):
-#         print self.logfile
-#         argv.append(self.logfile1)
-#         sys.argv = argv
-#         parser = LogChecker.make_parser()
-#         opts, args = LogChecker.check_parser_options(parser)
-#         self.assert_true(opts.error)
-#         self.assert_equal(args, argv[-1:])
-
 
 if __name__ == "__main__":
     unittest.main()
