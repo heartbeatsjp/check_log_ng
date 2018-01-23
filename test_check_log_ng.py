@@ -250,12 +250,12 @@ class TestSequenceFunctions(unittest.TestCase):
         }
         log = LogChecker(initial_data)
 
-        f = open(self.logfile, 'a')
-        f.write("Dec  5 12:34:56 hostname noop: NOOP\n")
-        f.write(u"Dec  5 12:34:56 hostname test: エラー\n".encode("EUC-JP"))
-        f.write("Dec  5 12:34:57 hostname noop: NOOP\n")
-        f.flush()
-        f.close()
+        fileobj = open(self.logfile, 'a')
+        fileobj.write("Dec  5 12:34:56 hostname noop: NOOP\n")
+        fileobj.write(u"Dec  5 12:34:56 hostname test: エラー\n".encode("EUC-JP"))
+        fileobj.write("Dec  5 12:34:57 hostname noop: NOOP\n")
+        fileobj.flush()
+        fileobj.close()
 
         log.check_log(self.logfile, self.seekfile)
 
