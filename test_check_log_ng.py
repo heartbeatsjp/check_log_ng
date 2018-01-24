@@ -2,8 +2,14 @@
 # -*- coding: utf-8 -*-
 """Unit test for check_log_ng"""
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+from __future__ import unicode_literals
 import unittest
+import warnings
 import os
+import io
 import time
 import subprocess
 from check_log_ng import LogChecker
@@ -129,7 +135,7 @@ class TestSequenceFunctions(unittest.TestCase):
         }
         log = LogChecker(initial_data)
 
-        fileobj = open(self.logfile, 'a')
+        fileobj = io.open(self.logfile, mode='a')
         fileobj.write("[Thu Dec 05 12:34:56 2013] [error] NOOP\n")
         fileobj.write("[Thu Dec 05 12:34:56 2013] [error] ERROR\n")
         fileobj.write("[Thu Dec 05 12:34:57 2013] [error] NOOP\n")
@@ -139,7 +145,7 @@ class TestSequenceFunctions(unittest.TestCase):
         log.check_log(self.logfile, self.seekfile)
 
         self.assertEqual(log.get_state(), LogChecker.STATE_WARNING)
-        self.assertEqual(log.get_message(), "WARNING: Found 1 lines (limit=1/0): [Thu Dec 05 12:34:56 2013] [error] ERROR at %s" % self.logfile)
+        self.assertEqual(log.get_message(), "WARNING: Found 1 lines (limit=1/0): [Thu Dec 05 12:34:56 2013] [error] ERROR at {0}".format(self.logfile))
 
     def test_pattern(self):
         """--pattern option
@@ -162,7 +168,7 @@ class TestSequenceFunctions(unittest.TestCase):
         }
         log = LogChecker(initial_data)
 
-        fileobj = open(self.logfile, 'a')
+        fileobj = io.open(self.logfile, mode='a')
         fileobj.write("Dec  5 12:34:56 hostname noop: NOOP\n")
         fileobj.write("Dec  5 12:34:56 hostname test: ERROR\n")
         fileobj.write("Dec  5 12:34:57 hostname noop: NOOP\n")
@@ -172,7 +178,7 @@ class TestSequenceFunctions(unittest.TestCase):
         log.check_log(self.logfile, self.seekfile)
 
         self.assertEqual(log.get_state(), LogChecker.STATE_WARNING)
-        self.assertEqual(log.get_message(), 'WARNING: Found 1 lines (limit=1/0): Dec  5 12:34:56 hostname test: ERROR at %s' % self.logfile)
+        self.assertEqual(log.get_message(), "WARNING: Found 1 lines (limit=1/0): Dec  5 12:34:56 hostname test: ERROR at {0}".format(self.logfile))
 
     def test_pattern_no_matches(self):
         """--pattern option
@@ -195,7 +201,7 @@ class TestSequenceFunctions(unittest.TestCase):
         }
         log = LogChecker(initial_data)
 
-        fileobj = open(self.logfile, 'a')
+        fileobj = io.open(self.logfile, mode='a')
         fileobj.write("Dec  5 12:34:56 hostname noop: NOOP\n")
         fileobj.write("Dec  5 12:34:57 hostname noop: NOOP\n")
         fileobj.flush()
@@ -204,7 +210,7 @@ class TestSequenceFunctions(unittest.TestCase):
         log.check_log(self.logfile, self.seekfile)
 
         self.assertEqual(log.get_state(), LogChecker.STATE_OK)
-        self.assertEqual(log.get_message(), 'OK - No matches found.')
+        self.assertEqual(log.get_message(), "OK - No matches found.")
 
     def test_pattern_with_case_insensitive(self):
         """--pattern and --case-insensitive options
@@ -227,7 +233,7 @@ class TestSequenceFunctions(unittest.TestCase):
         }
         log = LogChecker(initial_data)
 
-        fileobj = open(self.logfile, 'a')
+        fileobj = io.open(self.logfile, mode='a')
         fileobj.write("Dec  5 12:34:56 hostname noop: NOOP\n")
         fileobj.write("Dec  5 12:34:56 hostname test: ERROR\n")
         fileobj.write("Dec  5 12:34:57 hostname noop: NOOP\n")
@@ -237,7 +243,7 @@ class TestSequenceFunctions(unittest.TestCase):
         log.check_log(self.logfile, self.seekfile)
 
         self.assertEqual(log.get_state(), LogChecker.STATE_WARNING)
-        self.assertEqual(log.get_message(), 'WARNING: Found 1 lines (limit=1/0): Dec  5 12:34:56 hostname test: ERROR at %s' % self.logfile)
+        self.assertEqual(log.get_message(), "WARNING: Found 1 lines (limit=1/0): Dec  5 12:34:56 hostname test: ERROR at {0}".format(self.logfile))
 
     def test_pattern_with_encoding(self):
         """--pattern and --encoding
@@ -261,9 +267,9 @@ class TestSequenceFunctions(unittest.TestCase):
         }
         log = LogChecker(initial_data)
 
-        fileobj = open(self.logfile, 'a')
+        fileobj = io.open(self.logfile, mode='w', encoding='EUC-JP')
         fileobj.write("Dec  5 12:34:56 hostname noop: NOOP\n")
-        fileobj.write(u"Dec  5 12:34:56 hostname test: エラー\n".encode("EUC-JP"))
+        fileobj.write("Dec  5 12:34:56 hostname test: エラー\n")
         fileobj.write("Dec  5 12:34:57 hostname noop: NOOP\n")
         fileobj.flush()
         fileobj.close()
@@ -271,7 +277,7 @@ class TestSequenceFunctions(unittest.TestCase):
         log.check_log(self.logfile, self.seekfile)
 
         self.assertEqual(log.get_state(), LogChecker.STATE_WARNING)
-        self.assertEqual(log.get_message(), 'WARNING: Found 1 lines (limit=1/0): Dec  5 12:34:56 hostname test: エラー at %s' % self.logfile)
+        self.assertEqual(log.get_message(), "WARNING: Found 1 lines (limit=1/0): Dec  5 12:34:56 hostname test: エラー at {0}".format(self.logfile))
 
     def test_criticalpattern(self):
         """--criticalpattern option
@@ -294,7 +300,7 @@ class TestSequenceFunctions(unittest.TestCase):
         }
         log = LogChecker(initial_data)
 
-        fileobj = open(self.logfile, 'a')
+        fileobj = io.open(self.logfile, mode='a')
         fileobj.write("Dec  5 12:34:56 hostname noop: NOOP\n")
         fileobj.write("Dec  5 12:34:56 hostname test: ERROR\n")
         fileobj.write("Dec  5 12:34:57 hostname noop: NOOP\n")
@@ -304,7 +310,7 @@ class TestSequenceFunctions(unittest.TestCase):
         log.check_log(self.logfile, self.seekfile)
 
         self.assertEqual(log.get_state(), LogChecker.STATE_CRITICAL)
-        self.assertEqual(log.get_message(), 'CRITICAL: Critical Found 1 lines: Dec  5 12:34:56 hostname test: ERROR at %s' % self.logfile)
+        self.assertEqual(log.get_message(), "CRITICAL: Critical Found 1 lines: Dec  5 12:34:56 hostname test: ERROR at {0}".format(self.logfile))
 
     def test_criticalpattern_with_negpattern(self):
         """--criticalpattern option
@@ -327,7 +333,7 @@ class TestSequenceFunctions(unittest.TestCase):
         }
         log = LogChecker(initial_data)
 
-        fileobj = open(self.logfile, 'a')
+        fileobj = io.open(self.logfile, mode='a')
         fileobj.write("Dec  5 12:34:56 hostname noop: NOOP\n")
         fileobj.write("Dec  5 12:34:56 hostname test: ERROR IGNORE\n")
         fileobj.write("Dec  5 12:34:57 hostname noop: NOOP\n")
@@ -337,7 +343,7 @@ class TestSequenceFunctions(unittest.TestCase):
         log.check_log(self.logfile, self.seekfile)
 
         self.assertEqual(log.get_state(), LogChecker.STATE_CRITICAL)
-        self.assertEqual(log.get_message(), 'CRITICAL: Critical Found 1 lines: Dec  5 12:34:56 hostname test: ERROR IGNORE at %s' % self.logfile)
+        self.assertEqual(log.get_message(), "CRITICAL: Critical Found 1 lines: Dec  5 12:34:56 hostname test: ERROR IGNORE at {0}".format(self.logfile))
 
     def test_criticalpattern_with_case_sensitive(self):
         """--criticalpattern and --case-insensitive options
@@ -360,7 +366,7 @@ class TestSequenceFunctions(unittest.TestCase):
         }
         log = LogChecker(initial_data)
 
-        fileobj = open(self.logfile, 'a')
+        fileobj = io.open(self.logfile, mode='a')
         fileobj.write("Dec  5 12:34:56 hostname noop: NOOP\n")
         fileobj.write("Dec  5 12:34:56 hostname test: ERROR\n")
         fileobj.write("Dec  5 12:34:57 hostname noop: NOOP\n")
@@ -370,7 +376,7 @@ class TestSequenceFunctions(unittest.TestCase):
         log.check_log(self.logfile, self.seekfile)
 
         self.assertEqual(log.get_state(), LogChecker.STATE_CRITICAL)
-        self.assertEqual(log.get_message(), 'CRITICAL: Critical Found 1 lines: Dec  5 12:34:56 hostname test: ERROR at %s' % self.logfile)
+        self.assertEqual(log.get_message(), "CRITICAL: Critical Found 1 lines: Dec  5 12:34:56 hostname test: ERROR at {0}".format(self.logfile))
 
     def test_negpattern(self):
         """--negpattern option
@@ -393,7 +399,7 @@ class TestSequenceFunctions(unittest.TestCase):
         }
         log = LogChecker(initial_data)
 
-        fileobj = open(self.logfile, 'a')
+        fileobj = io.open(self.logfile, mode='a')
         fileobj.write("Dec  5 12:34:56 hostname noop: NOOP\n")
         fileobj.write("Dec  5 12:34:56 hostname test: ERROR IGNORE\n")
         fileobj.write("Dec  5 12:34:57 hostname noop: NOOP\n")
@@ -403,7 +409,7 @@ class TestSequenceFunctions(unittest.TestCase):
         log.check_log(self.logfile, self.seekfile)
 
         self.assertEqual(log.get_state(), LogChecker.STATE_OK)
-        self.assertEqual(log.get_message(), 'OK - No matches found.')
+        self.assertEqual(log.get_message(), "OK - No matches found.")
 
     def test_critical_negpattern(self):
         """--critical-negpattern option
@@ -426,7 +432,7 @@ class TestSequenceFunctions(unittest.TestCase):
         }
         log = LogChecker(initial_data)
 
-        fileobj = open(self.logfile, 'a')
+        fileobj = io.open(self.logfile, mode='a')
         fileobj.write("Dec  5 12:34:56 hostname noop: NOOP\n")
         fileobj.write("Dec  5 12:34:56 hostname test: FATAL ERROR IGNORE\n")
         fileobj.write("Dec  5 12:34:57 hostname noop: NOOP\n")
@@ -436,7 +442,7 @@ class TestSequenceFunctions(unittest.TestCase):
         log.check_log(self.logfile, self.seekfile)
 
         self.assertEqual(log.get_state(), LogChecker.STATE_OK)
-        self.assertEqual(log.get_message(), 'OK - No matches found.')
+        self.assertEqual(log.get_message(), "OK - No matches found.")
 
     def test_critical_negpattern_with_pattern(self):
         """--criticalpattern option
@@ -459,7 +465,7 @@ class TestSequenceFunctions(unittest.TestCase):
         }
         log = LogChecker(initial_data)
 
-        fileobj = open(self.logfile, 'a')
+        fileobj = io.open(self.logfile, mode='a')
         fileobj.write("Dec  5 12:34:56 hostname noop: NOOP\n")
         fileobj.write("Dec  5 12:34:56 hostname test: IGNORE FATAL\n")
         fileobj.write("Dec  5 12:34:57 hostname noop: NOOP\n")
@@ -469,7 +475,7 @@ class TestSequenceFunctions(unittest.TestCase):
         log.check_log(self.logfile, self.seekfile)
 
         self.assertEqual(log.get_state(), LogChecker.STATE_OK)
-        self.assertEqual(log.get_message(), 'OK - No matches found.')
+        self.assertEqual(log.get_message(), "OK - No matches found.")
 
     def test_critical_negpattern_with_pattern_and_criticalpattern(self):
         """--criticalpattern option
@@ -492,7 +498,7 @@ class TestSequenceFunctions(unittest.TestCase):
         }
         log = LogChecker(initial_data)
 
-        fileobj = open(self.logfile, 'a')
+        fileobj = io.open(self.logfile, mode='a')
         fileobj.write("Dec  5 12:34:56 hostname noop: NOOP\n")
         fileobj.write("Dec  5 12:34:56 hostname test: ERROR IGNORE FATAL\n")
         fileobj.write("Dec  5 12:34:57 hostname noop: NOOP\n")
@@ -502,7 +508,7 @@ class TestSequenceFunctions(unittest.TestCase):
         log.check_log(self.logfile, self.seekfile)
 
         self.assertEqual(log.get_state(), LogChecker.STATE_OK)
-        self.assertEqual(log.get_message(), 'OK - No matches found.')
+        self.assertEqual(log.get_message(), "OK - No matches found.")
 
     def test_negpattern_with_case_insensitive(self):
         """--negpattern and --case-insensitive options
@@ -525,7 +531,7 @@ class TestSequenceFunctions(unittest.TestCase):
         }
         log = LogChecker(initial_data)
 
-        fileobj = open(self.logfile, 'a')
+        fileobj = io.open(self.logfile, mode='a')
         fileobj.write("Dec  5 12:34:56 hostname noop: NOOP\n")
         fileobj.write("Dec  5 12:34:56 hostname test: ERROR IGNORE\n")
         fileobj.write("Dec  5 12:34:57 hostname noop: NOOP\n")
@@ -535,7 +541,7 @@ class TestSequenceFunctions(unittest.TestCase):
         log.check_log(self.logfile, self.seekfile)
 
         self.assertEqual(log.get_state(), LogChecker.STATE_OK)
-        self.assertEqual(log.get_message(), 'OK - No matches found.')
+        self.assertEqual(log.get_message(), "OK - No matches found.")
 
     def test_pattern_with_multiple_lines(self):
         """--pattern options with multiples lines
@@ -558,7 +564,7 @@ class TestSequenceFunctions(unittest.TestCase):
         }
         log = LogChecker(initial_data)
 
-        fileobj = open(self.logfile, 'a')
+        fileobj = io.open(self.logfile, mode='a')
         fileobj.write("Dec  5 12:34:56 hostname noop: NOOP\n")
         fileobj.write("Dec  5 12:34:56 hostname test: ERROR1\n")
         fileobj.write("Dec  5 12:34:56 hostname test: ERROR2\n")
@@ -569,7 +575,7 @@ class TestSequenceFunctions(unittest.TestCase):
         log.check_log(self.logfile, self.seekfile)
 
         self.assertEqual(log.get_state(), LogChecker.STATE_WARNING)
-        self.assertEqual(log.get_message(), 'WARNING: Found 1 lines (limit=1/0): Dec  5 12:34:56 hostname test: ERROR1 ERROR2 at %s' % self.logfile)
+        self.assertEqual(log.get_message(), "WARNING: Found 1 lines (limit=1/0): Dec  5 12:34:56 hostname test: ERROR1 ERROR2 at {0}".format(self.logfile))
 
     def test_negpattern_with_multiple_lines(self):
         """--negpattern options with multiple lines
@@ -592,7 +598,7 @@ class TestSequenceFunctions(unittest.TestCase):
         }
         log = LogChecker(initial_data)
 
-        fileobj = open(self.logfile, 'a')
+        fileobj = io.open(self.logfile, mode='a')
         fileobj.write("Dec  5 12:34:56 hostname test: ERROR\n")
         fileobj.write("Dec  5 12:34:56 hostname test: ERROR IGNORE\n")
         fileobj.flush()
@@ -643,7 +649,7 @@ class TestSequenceFunctions(unittest.TestCase):
         log.check_log_multi(self.logfile_pattern, self.seekdir, remove_seekfile=False)
 
         self.assertEqual(log.get_state(), LogChecker.STATE_WARNING)
-        self.assertEqual(log.get_message(), 'WARNING: Found 2 lines (limit=1/0): Dec  5 12:34:56 hostname test: ERROR at %s,Dec  5 12:34:59 hostname test: ERROR at %s' % (self.logfile1, self.logfile2))
+        self.assertEqual(log.get_message(), "WARNING: Found 2 lines (limit=1/0): Dec  5 12:34:56 hostname test: ERROR at {0},Dec  5 12:34:59 hostname test: ERROR at {1}".format(self.logfile1, self.logfile2))
 
     def test_logfile_with_filename(self):
         """--logfile option with multiple filenames
@@ -682,11 +688,11 @@ class TestSequenceFunctions(unittest.TestCase):
         fileobj.flush()
         fileobj.close()
 
-        logfile_pattern = "%s %s" % (self.logfile1, self.logfile2)
+        logfile_pattern = "{0} {1}".format(self.logfile1, self.logfile2)
         log.check_log_multi(logfile_pattern, self.seekdir, remove_seekfile=False)
 
         self.assertEqual(log.get_state(), LogChecker.STATE_WARNING)
-        self.assertEqual(log.get_message(), 'WARNING: Found 2 lines (limit=1/0): Dec  5 12:34:56 hostname test: ERROR at %s,Dec  5 12:34:59 hostname test: ERROR at %s' % (self.logfile1, self.logfile2))
+        self.assertEqual(log.get_message(), "WARNING: Found 2 lines (limit=1/0): Dec  5 12:34:56 hostname test: ERROR at {0},Dec  5 12:34:59 hostname test: ERROR at {1}".format(self.logfile1, self.logfile2))
 
     def test_scantime_without_scantime(self):
         """--scantime option without scantime.
@@ -754,7 +760,7 @@ class TestSequenceFunctions(unittest.TestCase):
         log.check_log_multi(self.logfile_pattern, self.seekdir, remove_seekfile=False)
 
         self.assertEqual(log.get_state(), LogChecker.STATE_WARNING)
-        self.assertEqual(log.get_message(), 'WARNING: Found 1 lines (limit=1/0): Dec  5 12:34:59 hostname test: ERROR at %s' % self.logfile1)
+        self.assertEqual(log.get_message(), "WARNING: Found 1 lines (limit=1/0): Dec  5 12:34:59 hostname test: ERROR at {0}".format(self.logfile1))
 
     def test_scantime_with_multiple_logfiles(self):
         """--scantime option with multiple logfiles.
@@ -797,7 +803,7 @@ class TestSequenceFunctions(unittest.TestCase):
         log.check_log_multi(self.logfile_pattern, self.seekdir, remove_seekfile=False)
 
         self.assertEqual(log.get_state(), LogChecker.STATE_WARNING)
-        self.assertEqual(log.get_message(), 'WARNING: Found 1 lines (limit=1/0): Dec  5 12:34:59 hostname test: ERROR at %s' % self.logfile2)
+        self.assertEqual(log.get_message(), "WARNING: Found 1 lines (limit=1/0): Dec  5 12:34:59 hostname test: ERROR at {0}".format(self.logfile2))
 
     def test_remove_seekfile_without_expiration(self):
         """--expiration and --remove-seekfile options
@@ -842,7 +848,7 @@ class TestSequenceFunctions(unittest.TestCase):
         log.check_log_multi(self.logfile_pattern, self.seekdir, remove_seekfile=True)
 
         self.assertEqual(log.get_state(), LogChecker.STATE_WARNING)
-        self.assertEqual(log.get_message(), 'WARNING: Found 1 lines (limit=1/0): Dec  5 12:34:59 hostname test: ERROR at %s' % self.logfile2)
+        self.assertEqual(log.get_message(), "WARNING: Found 1 lines (limit=1/0): Dec  5 12:34:59 hostname test: ERROR at {0}".format(self.logfile2))
         self.assertFalse(os.path.exists(self.seekfile1))
         self.assertTrue(os.path.exists(self.seekfile2))
 
@@ -889,7 +895,7 @@ class TestSequenceFunctions(unittest.TestCase):
         log.check_log_multi(self.logfile_pattern, self.seekdir, remove_seekfile=True)
 
         self.assertEqual(log.get_state(), LogChecker.STATE_WARNING)
-        self.assertEqual(log.get_message(), 'WARNING: Found 1 lines (limit=1/0): Dec  5 12:34:59 hostname test: ERROR at %s' % self.logfile2)
+        self.assertEqual(log.get_message(), "WARNING: Found 1 lines (limit=1/0): Dec  5 12:34:59 hostname test: ERROR at {0}".format(self.logfile2))
         self.assertTrue(os.path.exists(self.seekfile1))
         self.assertTrue(os.path.exists(self.seekfile2))
 
@@ -915,7 +921,7 @@ class TestSequenceFunctions(unittest.TestCase):
         log = LogChecker(initial_data)
 
         # create logfile
-        fileobj = open(self.logfile, 'a')
+        fileobj = io.open(self.logfile, mode='a')
         fileobj.write("Dec  5 12:34:51 hostname noop: NOOP\n")
         fileobj.write("Dec  5 12:34:51 hostname test: ERROR\n")
         fileobj.write("Dec  5 12:34:52 hostname noop: NOOP\n")
@@ -929,7 +935,7 @@ class TestSequenceFunctions(unittest.TestCase):
             self.logfile_pattern, self.seekdir, self.logfile, trace_inode=True)
 
         # update logfile
-        fileobj = open(self.logfile, 'a')
+        fileobj = io.open(self.logfile, mode='a')
         fileobj.write("Dec  5 12:34:55 hostname noop: NOOP\n")
         fileobj.write("Dec  5 12:34:55 hostname test: ERROR\n")
         fileobj.write("Dec  5 12:34:56 hostname noop: NOOP\n")
@@ -940,7 +946,7 @@ class TestSequenceFunctions(unittest.TestCase):
         os.rename(self.logfile, self.logfile1)
 
         # create a new logfile
-        fileobj = open(self.logfile, 'a')
+        fileobj = io.open(self.logfile, mode='a')
         fileobj.write("Dec  5 12:34:59 hostname noop: NOOP\n")
         fileobj.flush()
         fileobj.close()
@@ -953,7 +959,7 @@ class TestSequenceFunctions(unittest.TestCase):
             self.logfile_pattern, self.seekdir, self.logfile1, trace_inode=True)
 
         self.assertEqual(log.get_state(), LogChecker.STATE_WARNING)
-        self.assertEqual(log.get_message(), 'WARNING: Found 1 lines (limit=1/0): Dec  5 12:34:55 hostname test: ERROR at %s' % self.logfile1)
+        self.assertEqual(log.get_message(), "WARNING: Found 1 lines (limit=1/0): Dec  5 12:34:55 hostname test: ERROR at {0}".format(self.logfile1))
         self.assertEqual(seekfile_1, seekfile1_2)
         self.assertTrue(os.path.exists(seekfile_2))
         self.assertTrue(os.path.exists(seekfile1_2))
@@ -980,7 +986,7 @@ class TestSequenceFunctions(unittest.TestCase):
         log = LogChecker(initial_data)
 
         # create logfile
-        fileobj = open(self.logfile, 'a')
+        fileobj = io.open(self.logfile, mode='a')
         fileobj.write("Dec  5 12:34:50 hostname noop: NOOP\n")
         fileobj.write("Dec  5 12:34:51 hostname test: ERROR\n")
         fileobj.write("Dec  5 12:34:52 hostname noop: NOOP\n")
@@ -991,7 +997,7 @@ class TestSequenceFunctions(unittest.TestCase):
         os.rename(self.logfile, self.logfile1)
 
         # create new logfile
-        fileobj = open(self.logfile, 'a')
+        fileobj = io.open(self.logfile, mode='a')
         fileobj.write("Dec  5 12:34:53 hostname noop: NOOP\n")
         fileobj.write("Dec  5 12:34:53 hostname test: ERROR\n")
         fileobj.write("Dec  5 12:34:54 hostname noop: NOOP\n")
@@ -1008,7 +1014,7 @@ class TestSequenceFunctions(unittest.TestCase):
         time.sleep(4)
 
         # update logfile
-        fileobj = open(self.logfile, 'a')
+        fileobj = io.open(self.logfile, mode='a')
         fileobj.write("Dec  5 12:34:58 hostname noop: NOOP\n")
         fileobj.write("Dec  5 12:34:59 hostname test: ERROR\n")
         fileobj.write("Dec  5 12:34:59 hostname noop: NOOP\n")
@@ -1025,7 +1031,7 @@ class TestSequenceFunctions(unittest.TestCase):
             self.logfile_pattern, self.seekdir, self.logfile1, trace_inode=True)
 
         self.assertEqual(log.get_state(), LogChecker.STATE_WARNING)
-        self.assertEqual(log.get_message(), 'WARNING: Found 1 lines (limit=1/0): Dec  5 12:34:59 hostname test: ERROR at %s' % self.logfile1)
+        self.assertEqual(log.get_message(), "WARNING: Found 1 lines (limit=1/0): Dec  5 12:34:59 hostname test: ERROR at {0}".format(self.logfile1))
         self.assertEqual(seekfile_1, seekfile1_2)
         self.assertFalse(os.path.exists(seekfile1_1))
         self.assertTrue(os.path.exists(seekfile1_2))
@@ -1051,7 +1057,7 @@ class TestSequenceFunctions(unittest.TestCase):
         }
         log = LogChecker(initial_data)
 
-        fileobj = open(self.logfile, 'a')
+        fileobj = io.open(self.logfile, mode='a')
         fileobj.write("Dec | 5 12:34:56 hostname noop: NOOP\n")
         fileobj.write("Dec | 5 12:34:56 hostname test: ERROR\n")
         fileobj.write("Dec | 5 12:34:57 hostname noop: NOOP\n")
@@ -1061,7 +1067,7 @@ class TestSequenceFunctions(unittest.TestCase):
         log.check_log(self.logfile, self.seekfile)
 
         self.assertEqual(log.get_state(), LogChecker.STATE_WARNING)
-        self.assertEqual(log.get_message(), 'WARNING: Found 1 lines (limit=1/0): Dec (pipe) 5 12:34:56 hostname test: ERROR at %s' % self.logfile)
+        self.assertEqual(log.get_message(), "WARNING: Found 1 lines (limit=1/0): Dec (pipe) 5 12:34:56 hostname test: ERROR at {0}".format(self.logfile))
 
     def test_seekfile_tag(self):
         """--seekfile-tag
@@ -1085,7 +1091,7 @@ class TestSequenceFunctions(unittest.TestCase):
         log = LogChecker(initial_data)
 
         # create new logfiles
-        fileobj = open(self.logfile, 'a')
+        fileobj = io.open(self.logfile, mode='a')
         fileobj.write("Dec  5 12:34:51 hostname noop: NOOP\n")
         fileobj.write("Dec  5 12:34:51 hostname test: ERROR\n")
         fileobj.write("Dec  5 12:34:52 hostname noop: NOOP\n")
@@ -1117,7 +1123,7 @@ class TestSequenceFunctions(unittest.TestCase):
         log.check_log_multi(self.logfile_pattern, self.seekdir, seekfile_tag=self.tag2)
 
         self.assertEqual(log.get_state(), LogChecker.STATE_WARNING)
-        self.assertEqual(log.get_message(), 'WARNING: Found 1 lines (limit=1/0): Dec  5 12:34:56 hostname test: ERROR at %s' % self.logfile1)
+        self.assertEqual(log.get_message(), "WARNING: Found 1 lines (limit=1/0): Dec  5 12:34:56 hostname test: ERROR at {0}".format(self.logfile1))
         self.assertEqual(seekfile_1, seekfile_2)
         self.assertNotEqual(seekfile_1, seekfile_3)
         self.assertTrue(seekfile_1.find(self.tag1))
@@ -1147,7 +1153,7 @@ class TestSequenceFunctions(unittest.TestCase):
         log = LogChecker(initial_data)
 
         # create new logfiles
-        fileobj = open(self.logfile, 'a')
+        fileobj = io.open(self.logfile, mode='a')
         fileobj.write("Dec  5 12:34:51 hostname noop: NOOP\n")
         fileobj.write("Dec  5 12:34:51 hostname test: ERROR\n")
         fileobj.write("Dec  5 12:34:52 hostname noop: NOOP\n")
@@ -1157,7 +1163,7 @@ class TestSequenceFunctions(unittest.TestCase):
         log.check(self.logfile, '', self.seekdir)
 
         self.assertEqual(log.get_state(), LogChecker.STATE_WARNING)
-        self.assertEqual(log.get_message(), 'WARNING: Found 1 lines (limit=1/0): Dec  5 12:34:51 hostname test: ERROR at %s' % self.logfile)
+        self.assertEqual(log.get_message(), "WARNING: Found 1 lines (limit=1/0): Dec  5 12:34:51 hostname test: ERROR at {0}".format(self.logfile))
 
         log.clear_state()
         log.check(self.logfile, '', self.seekdir)
@@ -1187,7 +1193,7 @@ class TestSequenceFunctions(unittest.TestCase):
         log = LogChecker(initial_data)
 
         # create new logfiles
-        fileobj = open(self.logfile, 'a')
+        fileobj = io.open(self.logfile, mode='a')
         fileobj.write("Dec  5 12:34:51 hostname noop: NOOP\n")
         fileobj.write("Dec  5 12:34:51 hostname test: ERROR\n")
         fileobj.write("Dec  5 12:34:52 hostname noop: NOOP\n")
@@ -1196,12 +1202,12 @@ class TestSequenceFunctions(unittest.TestCase):
 
         log.check(self.logfile, '', self.seekdir)
         self.assertEqual(log.get_state(), LogChecker.STATE_WARNING)
-        self.assertEqual(log.get_message(), 'WARNING: Found 1 lines (limit=1/0): Dec  5 12:34:51 hostname test: ERROR at %s' % self.logfile)
+        self.assertEqual(log.get_message(), "WARNING: Found 1 lines (limit=1/0): Dec  5 12:34:51 hostname test: ERROR at {0}".format(self.logfile))
 
         log.clear_state()
         log.check(self.logfile, '', self.seekdir)
         self.assertEqual(log.get_state(), LogChecker.STATE_WARNING)
-        self.assertEqual(log.get_message(), 'WARNING: Found 1 lines (limit=1/0): Dec  5 12:34:51 hostname test: ERROR at %s' % self.logfile)
+        self.assertEqual(log.get_message(), "WARNING: Found 1 lines (limit=1/0): Dec  5 12:34:51 hostname test: ERROR at {0}".format(self.logfile))
 
     def test_check_with_expired_cache(self):
         """--cache --cachetime=1
@@ -1227,7 +1233,7 @@ class TestSequenceFunctions(unittest.TestCase):
         log = LogChecker(initial_data)
 
         # create new logfiles
-        fileobj = open(self.logfile, 'a')
+        fileobj = io.open(self.logfile, mode='a')
         fileobj.write("Dec  5 12:34:51 hostname noop: NOOP\n")
         fileobj.write("Dec  5 12:34:51 hostname test: ERROR\n")
         fileobj.write("Dec  5 12:34:52 hostname noop: NOOP\n")
@@ -1236,7 +1242,7 @@ class TestSequenceFunctions(unittest.TestCase):
 
         log.check(self.logfile, '', self.seekdir)
         self.assertEqual(log.get_state(), LogChecker.STATE_WARNING)
-        self.assertEqual(log.get_message(), 'WARNING: Found 1 lines (limit=1/0): Dec  5 12:34:51 hostname test: ERROR at %s' % self.logfile)
+        self.assertEqual(log.get_message(), "WARNING: Found 1 lines (limit=1/0): Dec  5 12:34:51 hostname test: ERROR at {0}".format(self.logfile))
 
         log.clear_state()
         time.sleep(2)
@@ -1268,7 +1274,7 @@ class TestSequenceFunctions(unittest.TestCase):
         log = LogChecker(initial_data)
 
         # create new logfiles
-        fileobj = open(self.logfile, 'a')
+        fileobj = io.open(self.logfile, mode='a')
         fileobj.write("Dec  5 12:34:51 hostname noop: NOOP\n")
         fileobj.write("Dec  5 12:34:51 hostname test: ERROR\n")
         fileobj.write("Dec  5 12:34:52 hostname noop: NOOP\n")
@@ -1279,18 +1285,18 @@ class TestSequenceFunctions(unittest.TestCase):
         lockfile = "".join([prefix_datafile, LogChecker.SUFFIX_LOCK])
         code = """import time
 from check_log_ng import LogChecker
-lockfile = '%s'
+lockfile = '{0}'
 lockfileobj = LogChecker.lock(lockfile)
 time.sleep(5)
 LogChecker.unlock(lockfile, lockfileobj)
-""" % lockfile
+""".format(lockfile)
         code = code.replace("\n", ";")
         proc = subprocess.Popen(['python', '-c', code])
         time.sleep(2)
         log.check(self.logfile, '', self.seekdir)
         proc.wait()
         self.assertEqual(log.get_state(), LogChecker.STATE_UNKNOWN)
-        self.assertEqual(log.get_message(), 'UNKNOWN: Lock timeout. Another process is running.')
+        self.assertEqual(log.get_message(), "UNKNOWN: Lock timeout. Another process is running.")
 
     def test_lock_timeout_without_timeout(self):
         """--lock-timeout without timeout
@@ -1317,7 +1323,7 @@ LogChecker.unlock(lockfile, lockfileobj)
         log = LogChecker(initial_data)
 
         # create new logfiles
-        fileobj = open(self.logfile, 'a')
+        fileobj = io.open(self.logfile, mode='a')
         fileobj.write("Dec  5 12:34:51 hostname noop: NOOP\n")
         fileobj.write("Dec  5 12:34:51 hostname test: ERROR\n")
         fileobj.write("Dec  5 12:34:52 hostname noop: NOOP\n")
@@ -1328,18 +1334,18 @@ LogChecker.unlock(lockfile, lockfileobj)
         lockfile = "".join([prefix_datafile, LogChecker.SUFFIX_LOCK])
         code = """import time
 from check_log_ng import LogChecker
-lockfile = '%s'
+lockfile = '{0}'
 lockfileobj = LogChecker.lock(lockfile)
 time.sleep(3)
 LogChecker.unlock(lockfile, lockfileobj)
-""" % lockfile
+""".format(lockfile)
         code = code.replace("\n", ";")
         proc = subprocess.Popen(['python', '-c', code])
         time.sleep(2)
         log.check(self.logfile, '', self.seekdir)
         proc.wait()
         self.assertEqual(log.get_state(), LogChecker.STATE_WARNING)
-        self.assertEqual(log.get_message(), 'WARNING: Found 1 lines (limit=1/0): Dec  5 12:34:51 hostname test: ERROR at %s' % self.logfile)
+        self.assertEqual(log.get_message(), "WARNING: Found 1 lines (limit=1/0): Dec  5 12:34:51 hostname test: ERROR at {0}".format(self.logfile))
 
     def test_get_prefix_datafile(self):
         """LogChecker.get_prefix_datafile()
@@ -1360,6 +1366,7 @@ LogChecker.unlock(lockfile, lockfileobj)
         lockfile = "".join([prefix_datafile, LogChecker.SUFFIX_LOCK])
         lockfileobj = LogChecker.lock(lockfile)
         self.assertNotEqual(lockfileobj, None)
+        LogChecker.unlock(lockfile, lockfileobj)
 
     def test_lock_with_timeout(self):
         """LogChecker.lock() with timeout.
@@ -1368,15 +1375,17 @@ LogChecker.unlock(lockfile, lockfileobj)
         lockfile = "".join([prefix_datafile, LogChecker.SUFFIX_LOCK])
         code = """import time
 from check_log_ng import LogChecker
-lockfile = '%s'
+lockfile = '{0}'
 lockfileobj = LogChecker.lock(lockfile)
 time.sleep(4)
 LogChecker.unlock(lockfile, lockfileobj)
-""" % lockfile
+""".format(lockfile)
         code = code.replace("\n", ";")
         proc = subprocess.Popen(['python', '-c', code])
         time.sleep(2)
-        lockfileobj = LogChecker.lock(lockfile)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            lockfileobj = LogChecker.lock(lockfile)
         proc.wait()
         self.assertEqual(lockfileobj, None)
 
