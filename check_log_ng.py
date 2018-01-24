@@ -100,11 +100,26 @@ class LogChecker(object):
 
         return True
 
-    def _find_pattern(self, pattern_list, message, negative=False, critical=False):
+    def _find_pattern(self, message, negative=False, critical=False):
         """Find pattern.
 
            If found, return True.
         """
+        if negative:
+            if critical:
+                pattern_list = self.critical_negpattern_list
+                pattern_type = "critical_negpattern"
+            else:
+                pattern_list = self.negpattern_list
+                pattern_type = "negpattern"
+        else:
+            if critical:
+                pattern_list = self.critical_pattern_list
+                pattern_type = "critical_pattern"
+            else:
+                pattern_list = self.pattern_list
+                pattern_type = "pattern"
+
         if not pattern_list:
             return False
         for pattern in pattern_list:
@@ -113,16 +128,7 @@ class LogChecker(object):
             pattern = LogChecker.to_unicode(pattern)
             matchobj = re.search(pattern, message, self.pattern_flags)
             if matchobj:
-                if negative:
-                    if critical:
-                        _debug("critical_negpattern: '{0}' found".format(pattern))
-                    else:
-                        _debug("negpattern: '{0}' found".format(pattern))
-                else:
-                    if critical:
-                        _debug("critical_pattern: '{0}' found".format(pattern))
-                    else:
-                        _debug("pattern: '{0}' found".format(pattern))
+                _debug("{0}: '{1}' found".format(pattern_type, pattern))
                 return True
         return False
 
@@ -231,16 +237,14 @@ class LogChecker(object):
 
     def _set_found(self, message, found, critical_found):
         """Set the found and critical_found if matching pattern is found."""
-        found_negpattern = self._find_pattern(
-            self.negpattern_list, message, negative=True)
-        found_critical_negpattern = self._find_pattern(
-            self.critical_negpattern_list, message, negative=True, critical=True)
+        found_negpattern = self._find_pattern(message, negative=True)
+        found_critical_negpattern = self._find_pattern(message, negative=True, critical=True)
 
         if not found_negpattern and not found_critical_negpattern:
-            if self._find_pattern(self.pattern_list, message):
+            if self._find_pattern(message):
                 found.append(message)
         if not found_critical_negpattern:
-            if self._find_pattern(self.critical_pattern_list, message, critical=True):
+            if self._find_pattern(message, critical=True):
                 critical_found.append(message)
         return
 
