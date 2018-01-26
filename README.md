@@ -1,6 +1,6 @@
 # check_log_ng
 
-![Build Status](https://travis-ci.org/heartbeatsjp/check_log_ng.svg?branch=master)
+[![Build Status](https://travis-ci.org/heartbeatsjp/check_log_ng.svg?branch=master)](https://travis-ci.org/heartbeatsjp/check_log_ng)
 
 A log file regular expression-based parser plugin for Nagios.
 
