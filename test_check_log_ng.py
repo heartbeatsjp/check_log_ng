@@ -774,7 +774,7 @@ class LogCheckerTestCase(unittest.TestCase):
         """--lock-timeout
         """
         self.config["pattern_list"] = ["ERROR"]
-        self.config["lock_timeout"] = 4
+        self.config["lock_timeout"] = 6
         log = LogChecker(self.config)
 
         # within lock_timeout
@@ -783,8 +783,8 @@ class LogCheckerTestCase(unittest.TestCase):
         self._write_logfile(self.logfile, line)
 
         # locked by an another process
-        proc = self._run_locked_subprocess(2)
-        time.sleep(1)
+        proc = self._run_locked_subprocess(4)
+        time.sleep(2)
 
         # check
         log.clear_state()
@@ -802,8 +802,8 @@ class LogCheckerTestCase(unittest.TestCase):
         self._write_logfile(self.logfile, line)
 
         # locked by an another process
-        proc = self._run_locked_subprocess(6)
-        time.sleep(1)
+        proc = self._run_locked_subprocess(10)
+        time.sleep(2)
 
         # check
         log.clear_state()
@@ -844,8 +844,8 @@ class LogCheckerTestCase(unittest.TestCase):
 
         # lock failed
         # locked by an another process
-        proc = self._run_locked_subprocess(3)
-        time.sleep(1)
+        proc = self._run_locked_subprocess(4)
+        time.sleep(2)
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             lockfileobj = LogChecker.lock(self.lockfile)
