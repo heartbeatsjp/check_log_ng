@@ -61,38 +61,40 @@ class LogChecker(object):
         {'_PERCENT_': '%'},
     ]
 
-    def __init__(self, initial_data):
+    def __init__(self, config):
         """ Constructor."""
         # set default value
-        self.logformat = LogChecker.FORMAT_SYSLOG
-        self.pattern_list = []
-        self.critical_pattern_list = []
-        self.negpattern_list = []
-        self.critical_negpattern_list = []
-        self.case_insensitive = False
-        self.encoding = 'utf-8'
-        self.warning = 1
-        self.critical = 0
-        self.nodiff_warn = False
-        self.nodiff_crit = False
-        self.trace_inode = False
-        self.multiline = False
-        self.scantime = 86400
-        self.expiration = 691200
-        self.cache = False
-        self.cachetime = 60
-        self.lock_timeout = 3
+        self.config = {}
+        self.config['logformat'] = LogChecker.FORMAT_SYSLOG
+        self.config['pattern_list'] = []
+        self.config['critical_pattern_list'] = []
+        self.config['negpattern_list'] = []
+        self.config['critical_negpattern_list'] = []
+        self.config['case_insensitive'] = False
+        self.config['encoding'] = 'utf-8'
+        self.config['warning'] = 1
+        self.config['critical'] = 0
+        self.config['nodiff_warn'] = False
+        self.config['nodiff_crit'] = False
+        self.config['trace_inode'] = False
+        self.config['multiline'] = False
+        self.config['scantime'] = 86400
+        self.config['expiration'] = 691200
+        self.config['cache'] = False
+        self.config['cachetime'] = 60
+        self.config['lock_timeout'] = 3
 
-        # set initial_data
-        for key in initial_data:
-            setattr(self, key, initial_data[key])
+        # overwrite values with user's values
+        for key in self.config:
+            if key in config:
+                self.config[key] = config[key]
 
         self.pattern_flags = 0
-        if self.case_insensitive:
+        if self.config['case_insensitive']:
             self.pattern_flags = re.IGNORECASE
 
         self.re_logformat = re.compile(LogChecker.expand_logformat_by_strftime(
-            LogChecker.to_unicode(self.logformat)))
+            LogChecker.to_unicode(self.config['logformat'])))
 
         # status variables
         self.state = None
@@ -108,7 +110,7 @@ class LogChecker(object):
 
         If updated, return True.
         """
-        if os.stat(logfile).st_mtime < time.time() - self.scantime:
+        if os.stat(logfile).st_mtime < time.time() - self.config['scantime']:
             _debug("Skipped: mtime < curtime - scantime")
             return False
 
@@ -125,17 +127,17 @@ class LogChecker(object):
         """
         if negative:
             if critical:
-                pattern_list = self.critical_negpattern_list
+                pattern_list = self.config['critical_negpattern_list']
                 pattern_type = "critical_negpattern"
             else:
-                pattern_list = self.negpattern_list
+                pattern_list = self.config['negpattern_list']
                 pattern_type = "negpattern"
         else:
             if critical:
-                pattern_list = self.critical_pattern_list
+                pattern_list = self.config['critical_pattern_list']
                 pattern_type = "critical_pattern"
             else:
-                pattern_list = self.pattern_list
+                pattern_list = self.config['pattern_list']
                 pattern_type = "pattern"
 
         if not pattern_list:
@@ -171,7 +173,7 @@ class LogChecker(object):
             for seekfile in glob.glob(seekfile_pattern):
                 if not os.path.isfile(seekfile):
                     continue
-                if curtime - self.expiration <= os.stat(seekfile).st_mtime:
+                if curtime - self.config['expiration'] <= os.stat(seekfile).st_mtime:
                     continue
                 try:
                     _debug("remove seekfile: {0}".format(seekfile))
@@ -193,7 +195,7 @@ class LogChecker(object):
             self, seekfile_directory, logfile_pattern, seekfile_tag=''):
         """Remove old inode-based seek files."""
         prefix = None
-        if self.trace_inode:
+        if self.config['trace_inode']:
             prefix = LogChecker.get_digest(logfile_pattern)
 
         cwd = os.getcwd()
@@ -210,7 +212,7 @@ class LogChecker(object):
         for seekfile in glob.glob(seekfile_pattern):
             if not os.path.isfile(seekfile):
                 continue
-            if curtime - self.expiration <= os.stat(seekfile).st_mtime:
+            if curtime - self.config['expiration'] <= os.stat(seekfile).st_mtime:
                 continue
             try:
                 _debug("remove seekfile: {0}".format(seekfile))
@@ -250,12 +252,12 @@ class LogChecker(object):
         if num > 0:
             self.messages.append(
                 "Found {0} lines (limit={1}/{2}): {3}".format(
-                    num, self.warning, self.critical,
+                    num, self.config['warning'], self.config['critical'],
                     ','.join(self.found_messages)))
-            if self.critical > 0 and self.critical <= num:
+            if self.config['critical'] > 0 and self.config['critical'] <= num:
                 if self.state is None:
                     self.state = LogChecker.STATE_CRITICAL
-            if self.warning > 0 and self.warning <= num:
+            if self.config['warning'] > 0 and self.config['warning'] <= num:
                 if self.state is None:
                     self.state = LogChecker.STATE_WARNING
         if self.state is None:
@@ -286,7 +288,8 @@ class LogChecker(object):
         cur_message = None
 
         fileobj = io.open(
-            logfile, mode='r', encoding=self.encoding, errors='replace')
+            logfile, mode='r', encoding=self.config['encoding'],
+            errors='replace')
         fileobj.seek(start_position, 0)
 
         for line in fileobj:
@@ -330,7 +333,8 @@ class LogChecker(object):
             self, logfile, start_position, found, critical_found):
         """Match the pattern each a single line in the log file."""
         fileobj = io.open(
-            logfile, mode='r', encoding=self.encoding, errors='replace')
+            logfile, mode='r', encoding=self.config['encoding'],
+            errors='replace')
         fileobj.seek(start_position, 0)
 
         for line in fileobj:
@@ -349,14 +353,14 @@ class LogChecker(object):
         """
         prefix_datafile = LogChecker.get_prefix_datafile(
             seekfile, seekfile_directory, seekfile_tag)
-        if self.cache:
+        if self.config['cache']:
             cachefile = "".join([prefix_datafile, LogChecker.SUFFIX_CACHE])
         lockfile = "".join([prefix_datafile, LogChecker.SUFFIX_LOCK])
         locked = False
         cur_time = time.time()
-        timeout_time = cur_time + self.lock_timeout
+        timeout_time = cur_time + self.config['lock_timeout']
         while cur_time < timeout_time:
-            if self.cache:
+            if self.config['cache']:
                 state, message = self.get_cache(cachefile)
                 if state != LogChecker.STATE_NO_CACHE:
                     self.state = state
@@ -387,10 +391,11 @@ class LogChecker(object):
                 logfile = logfile_pattern
                 seekfile = LogChecker.get_seekfile(
                     logfile_pattern, seekfile_directory, logfile,
-                    trace_inode=self.trace_inode, seekfile_tag=seekfile_tag)
+                    trace_inode=self.config['trace_inode'],
+                    seekfile_tag=seekfile_tag)
             self.check_log(logfile_pattern, seekfile)
 
-        if self.cache:
+        if self.config['cache']:
             self.update_cache(cachefile)
 
         LogChecker.unlock(lockfile, lockfileobj)
@@ -415,7 +420,7 @@ class LogChecker(object):
 
         found = []
         critical_found = []
-        if self.multiline:
+        if self.config['multiline']:
             end_position = self._check_each_multiple_lines(
                 logfile, start_position, found, critical_found)
         else:
@@ -444,11 +449,12 @@ class LogChecker(object):
                 continue
             seekfile = LogChecker.get_seekfile(
                 logfile_pattern, seekfile_directory, logfile,
-                trace_inode=self.trace_inode, seekfile_tag=seekfile_tag)
+                trace_inode=self.config['trace_inode'],
+                seekfile_tag=seekfile_tag)
             self.check_log(logfile, seekfile)
 
         if remove_seekfile:
-            if self.trace_inode:
+            if self.config['trace_inode']:
                 self._remove_old_seekfile_with_inode(
                     seekfile_directory, logfile_pattern, seekfile_tag)
             else:
@@ -494,7 +500,7 @@ class LogChecker(object):
         """Get the cache."""
         if not os.path.exists(cachefile):
             return LogChecker.STATE_NO_CACHE, None
-        if os.stat(cachefile).st_mtime < time.time() - self.cachetime:
+        if os.stat(cachefile).st_mtime < time.time() - self.config['cachetime']:
             _debug("Cache is expired: mtime < curtime - cachetime")
             return LogChecker.STATE_NO_CACHE, None
         fileobj = io.open(cachefile, mode='r', encoding='utf-8')
@@ -974,7 +980,7 @@ def _check_parser_args(parser):
     return args
 
 
-def _generate_initial_data(args):
+def _generate_config(args):
     """Generate initial data."""
     # make pattern list
     pattern_list = LogChecker.get_pattern_list(args.pattern, args.patternfile)
@@ -986,7 +992,7 @@ def _generate_initial_data(args):
         args.critical_negpattern, args.critical_negpatternfile)
 
     # set value of args
-    initial_data = {
+    config = {
         "logformat": args.logformat,
         "pattern_list": pattern_list,
         "critical_pattern_list": critical_pattern_list,
@@ -1006,7 +1012,7 @@ def _generate_initial_data(args):
         "cachetime": args.cachetime,
         "lock_timeout": args.lock_timeout
     }
-    return initial_data
+    return config
 
 
 def main():
@@ -1014,8 +1020,8 @@ def main():
     parser = _make_parser()
     args = _check_parser_args(parser)
 
-    initial_data = _generate_initial_data(args)
-    log = LogChecker(initial_data)
+    config = _generate_config(args)
+    log = LogChecker(config)
     log.check(args.logfile_pattern, args.seekfile,
               args.seekfile_directory, args.remove_seekfile,
               args.seekfile_tag)
