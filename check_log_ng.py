@@ -86,7 +86,7 @@ class LogChecker(object):
 
         # overwrite values with user's values
         for key in self.config:
-            if key in config and config[key]:
+            if key in config:
                 self.config[key] = config[key]
 
         self.pattern_flags = 0
