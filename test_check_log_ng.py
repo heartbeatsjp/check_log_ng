@@ -790,40 +790,77 @@ class LogCheckerTestCase(unittest.TestCase):
         log = LogChecker(self.config)
 
         # within lock_timeout
+        #   |time|sub        |main       |
+        #   |----|-----------|-----------|
+        #   |   0|fork       |sleep      |
+        #   |   1|lock OK    |sleep      |
+        #   |   1|           |check      |
+        #   |   1|           |lock fail  |
+        #   |   *|           |sleep      |
+        #   |   5|unlock OK  |sleep      |
+        #   |   5|           |lock OK    |
+        #   |   5|           |unlock OK  |
         # Dec  5 12:34:50 hostname test: ERROR
         line = self._make_line(self._get_timestamp(), "test", "ERROR")
         self._write_logfile(self.logfile, line)
 
         # locked by an another process
-        proc = self._run_locked_subprocess(4)
-        time.sleep(2)
+        locked_time = 4
+        wait_interval = 0.1
+        proc = self._run_locked_subprocess(locked_time)
+        for _ in range(100):
+            if os.path.isfile(self.lockfile):
+                break
+            time.sleep(wait_interval)
 
         # check
         log.clear_state()
+        start_time = time.time()
         log.check(self.logfile)
+        elapsed_time = time.time() - start_time
         proc.wait()
 
         self.assertEqual(log.get_state(), LogChecker.STATE_WARNING)
         self.assertEqual(
             log.get_message(),
             self.MESSAGE_WARNING_ONE.format(line, self.logfile))
+        self.assertTrue(elapsed_time < self.config["lock_timeout"])
+        self.assertTrue(elapsed_time > locked_time - wait_interval)
 
         # over lock_timeout
+        #   |time|sub        |main       |
+        #   |----|-----------|-----------|
+        #   |   0|fork       |sleep      |
+        #   |   1|lock OK    |sleep      |
+        #   |   1|           |check      |
+        #   |   1|           |lock fail  |
+        #   |   *|           |sleep      |
+        #   |   7|           |timeout    |
+        #   |   9|unlock OK  |           |
         # Dec  5 12:34:50 hostname test: ERROR
         line = self._make_line(self._get_timestamp(), "test", "ERROR")
         self._write_logfile(self.logfile, line)
 
         # locked by an another process
-        proc = self._run_locked_subprocess(10)
-        time.sleep(2)
+        locked_time = 8
+        wait_interval = 0.1
+        proc = self._run_locked_subprocess(locked_time)
+        for _ in range(100):
+            if os.path.isfile(self.lockfile):
+                break
+            time.sleep(wait_interval)
 
         # check
         log.clear_state()
+        start_time = time.time()
         log.check(self.logfile)
+        elapsed_time = time.time() - start_time
         proc.wait()
 
         self.assertEqual(log.get_state(), LogChecker.STATE_UNKNOWN)
         self.assertEqual(log.get_message(), self.MESSAGE_UNKNOWN_LOCK_TIMEOUT)
+        self.assertTrue(elapsed_time > self.config["lock_timeout"])
+        self.assertTrue(elapsed_time < locked_time)
 
     def test_get_cache_filename(self):
         """LogChecker.get_cache_filename()
@@ -873,10 +910,15 @@ class LogCheckerTestCase(unittest.TestCase):
         self.assertNotEqual(lockfileobj, None)
         LogChecker.unlock(self.lockfile, lockfileobj)
 
-        # lock failed
         # locked by an another process
-        proc = self._run_locked_subprocess(4)
-        time.sleep(2)
+        locked_time = 4
+        wait_interval = 0.1
+        proc = self._run_locked_subprocess(locked_time)
+        for _ in range(100):
+            if os.path.isfile(self.lockfile):
+                break
+            time.sleep(wait_interval)
+
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             lockfileobj = LogChecker.lock(self.lockfile)
