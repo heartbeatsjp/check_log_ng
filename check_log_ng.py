@@ -42,7 +42,7 @@ class LogChecker(object):
     SUFFIX_SEEK_WITH_INODE = ".inode.seek"
     SUFFIX_CACHE = ".cache"
     SUFFIX_LOCK = ".lock"
-    PREFIX_DATA = "check_log_ng"
+    PREFIX_STATE = "check_log_ng"
     RETRY_PERIOD = 0.5
     LOGFORMAT_EXPANSION_LIST = [
         {'%%': '_PERCENT_'},
@@ -66,6 +66,7 @@ class LogChecker(object):
         # set default value
         self.config = {}
         self.config['logformat'] = LogChecker.FORMAT_SYSLOG
+        self.config['state_directory'] = None
         self.config['pattern_list'] = []
         self.config['critical_pattern_list'] = []
         self.config['negpattern_list'] = []
@@ -152,15 +153,14 @@ class LogChecker(object):
                 return True
         return False
 
-    def _remove_old_seekfile(
-            self, seekfile_directory, logfile_pattern_list, seekfile_tag=''):
+    def _remove_old_seekfile(self, logfile_pattern_list, tag=''):
         """Remove old seek files."""
         cwd = os.getcwd()
         try:
-            os.chdir(seekfile_directory)
+            os.chdir(self.config['state_directory'])
         except OSError:
-            print("Unable to chdir seekfile_directory: {0}".format(
-                seekfile_directory))
+            print("Unable to chdir: {0}".format(
+                self.config['state_directory']))
             sys.exit(LogChecker.STATE_UNKNOWN)
 
         curtime = time.time()
@@ -169,7 +169,7 @@ class LogChecker(object):
                 continue
             seekfile_pattern = (
                 re.sub(r'[^-0-9A-Za-z*?]', '_', logfile_pattern) +
-                seekfile_tag + LogChecker.SUFFIX_SEEK)
+                tag + LogChecker.SUFFIX_SEEK)
             for seekfile in glob.glob(seekfile_pattern):
                 if not os.path.isfile(seekfile):
                     continue
@@ -191,8 +191,7 @@ class LogChecker(object):
 
         return True
 
-    def _remove_old_seekfile_with_inode(
-            self, seekfile_directory, logfile_pattern, seekfile_tag=''):
+    def _remove_old_seekfile_with_inode(self, logfile_pattern, tag=''):
         """Remove old inode-based seek files."""
         prefix = None
         if self.config['trace_inode']:
@@ -200,15 +199,15 @@ class LogChecker(object):
 
         cwd = os.getcwd()
         try:
-            os.chdir(seekfile_directory)
+            os.chdir(self.config['state_directory'])
         except OSError:
-            print("Unable to chdir seekfile_directory: {0}".format(
-                seekfile_directory))
+            print("Unable to chdir: {0}".format(
+                self.config['state_directory']))
             sys.exit(LogChecker.STATE_UNKNOWN)
 
         curtime = time.time()
         seekfile_pattern = "{0}.[0-9]*{1}{2}".format(
-            prefix, seekfile_tag, LogChecker.SUFFIX_SEEK_WITH_INODE)
+            prefix, tag, LogChecker.SUFFIX_SEEK_WITH_INODE)
         for seekfile in glob.glob(seekfile_pattern):
             if not os.path.isfile(seekfile):
                 continue
@@ -262,6 +261,19 @@ class LogChecker(object):
                     self.state = LogChecker.STATE_WARNING
         if self.state is None:
             self.state = LogChecker.STATE_OK
+        return
+
+    def _update_message(self):
+        state_string = 'OK'
+        message = 'OK - No matches found.'
+        if self.state == LogChecker.STATE_WARNING:
+            state_string = 'WARNING'
+        elif self.state == LogChecker.STATE_CRITICAL:
+            state_string = 'CRITICAL'
+        if self.state != LogChecker.STATE_OK:
+            message = "{0}: {1}".format(state_string, ', '.join(self.messages))
+            message = message.replace('|', '(pipe)')
+        self.message = message
         return
 
     def _set_found(self, message, found, critical_found):
@@ -346,22 +358,22 @@ class LogChecker(object):
         return end_position
 
     def check(
-            self, logfile_pattern, seekfile, seekfile_directory,
-            remove_seekfile=False, seekfile_tag=''):
+            self, logfile_pattern, seekfile=None,
+            remove_seekfile=False, tag=''):
         """Execute check_log_multi or check_log.
         If cache is enabled and exists, return cache.
         """
-        prefix_datafile = LogChecker.get_prefix_datafile(
-            seekfile, seekfile_directory, seekfile_tag)
         if self.config['cache']:
-            cachefile = "".join([prefix_datafile, LogChecker.SUFFIX_CACHE])
-        lockfile = "".join([prefix_datafile, LogChecker.SUFFIX_LOCK])
+            cachefile = LogChecker.get_cache_filename(
+                self.config['state_directory'], tag)
+        lockfile = LogChecker.get_lock_filename(
+            self.config['state_directory'], tag)
         locked = False
         cur_time = time.time()
         timeout_time = cur_time + self.config['lock_timeout']
         while cur_time < timeout_time:
             if self.config['cache']:
-                state, message = self.get_cache(cachefile)
+                state, message = self._get_cache(cachefile)
                 if state != LogChecker.STATE_NO_CACHE:
                     self.state = state
                     self.message = message
@@ -379,29 +391,32 @@ class LogChecker(object):
             self.message = "UNKNOWN: Lock timeout. Another process is running."
             return
 
-        seekfile = None
-        is_multiple_logfiles = LogChecker.is_multiple_logfiles(logfile_pattern)
-        if is_multiple_logfiles:
-            self.check_log_multi(
-                logfile_pattern, seekfile_directory, remove_seekfile,
-                seekfile_tag)
+        if LogChecker.is_multiple_logfiles(logfile_pattern):
+            self._check_log_multi(
+                logfile_pattern, remove_seekfile=remove_seekfile, tag=tag)
         else:
             # create seekfile
-            if not seekfile and seekfile_directory:
-                logfile = logfile_pattern
+            if not seekfile:
                 seekfile = LogChecker.get_seekfile(
-                    logfile_pattern, seekfile_directory, logfile,
-                    trace_inode=self.config['trace_inode'],
-                    seekfile_tag=seekfile_tag)
-            self.check_log(logfile_pattern, seekfile)
+                    logfile_pattern, self.config['state_directory'],
+                    logfile_pattern,
+                    trace_inode=self.config['trace_inode'], tag=tag)
+            self._check_log(logfile_pattern, seekfile)
 
         if self.config['cache']:
-            self.update_cache(cachefile)
+            self._update_cache(cachefile)
 
         LogChecker.unlock(lockfile, lockfileobj)
         return
 
     def check_log(self, logfile, seekfile):
+        """Check the log file.
+        Deprecated. Use check().
+        """
+        self.check(logfile, seekfile=seekfile)
+        return
+
+    def _check_log(self, logfile, seekfile):
         """Check the log file."""
         _debug("logfile='{0}', seekfile='{1}'".format(logfile, seekfile))
         if not os.path.exists(logfile):
@@ -440,26 +455,30 @@ class LogChecker(object):
         return
 
     def check_log_multi(
-            self, logfile_pattern, seekfile_directory,
-            remove_seekfile=False, seekfile_tag=''):
+            self, logfile_pattern, state_directory,
+            remove_seekfile=False, tag=''):
+        """Check the multiple log files.
+        Deprecated. Use check().
+        """
+        state_directory = state_directory  # not used
+        self.check(logfile_pattern, remove_seekfile=remove_seekfile, tag=tag)
+
+    def _check_log_multi(self, logfile_pattern, remove_seekfile=False, tag=''):
         """Check the multiple log files."""
         logfile_list = self._get_logfile_list(logfile_pattern)
         for logfile in logfile_list:
             if not os.path.isfile(logfile):
                 continue
             seekfile = LogChecker.get_seekfile(
-                logfile_pattern, seekfile_directory, logfile,
-                trace_inode=self.config['trace_inode'],
-                seekfile_tag=seekfile_tag)
-            self.check_log(logfile, seekfile)
+                logfile_pattern, self.config['state_directory'], logfile,
+                trace_inode=self.config['trace_inode'], tag=tag)
+            self._check_log(logfile, seekfile)
 
         if remove_seekfile:
             if self.config['trace_inode']:
-                self._remove_old_seekfile_with_inode(
-                    seekfile_directory, logfile_pattern, seekfile_tag)
+                self._remove_old_seekfile_with_inode(logfile_pattern, tag)
             else:
-                self._remove_old_seekfile(
-                    seekfile_directory, logfile_pattern, seekfile_tag)
+                self._remove_old_seekfile(logfile_pattern, tag)
         return
 
     def clear_state(self):
@@ -474,29 +493,26 @@ class LogChecker(object):
         return
 
     def get_state(self):
-        """Get the state of the result."""
+        """Get the state of the result.
+        When get_state() or get_message() is executed,
+        the state is retained until clear_state() is executed.
+        """
         if self.state is None:
             self._update_state()
         return self.state
 
     def get_message(self):
-        """Get the message of the result."""
+        """Get the message of the result.
+        When get_state() or get_message() is executed,
+        the message is retained until clear_state() is executed.
+        """
         if self.state is None:
             self._update_state()
         if self.message is None:
-            state_string = 'OK'
-            message = 'OK - No matches found.'
-            if self.state == LogChecker.STATE_WARNING:
-                state_string = 'WARNING'
-            elif self.state == LogChecker.STATE_CRITICAL:
-                state_string = 'CRITICAL'
-            if self.state != LogChecker.STATE_OK:
-                message = "{0}: {1}".format(
-                    state_string, ', '.join(self.messages))
-            self.message = message.replace('|', '(pipe)')
+            self._update_message()
         return self.message
 
-    def get_cache(self, cachefile):
+    def _get_cache(self, cachefile):
         """Get the cache."""
         if not os.path.exists(cachefile):
             return LogChecker.STATE_NO_CACHE, None
@@ -507,9 +523,10 @@ class LogChecker(object):
         line = fileobj.readline()
         fileobj.close()
         state, message = line.split("\t", 1)
+        _debug("cache: state={0}, message='{1}'".format(state, message))
         return int(state), message
 
-    def update_cache(self, cachefile):
+    def _update_cache(self, cachefile):
         """Update the cache."""
         tmp_cachefile = cachefile + "." + str(os.getpid())
         cachefileobj = io.open(tmp_cachefile, mode='w', encoding='utf-8')
@@ -550,21 +567,21 @@ class LogChecker(object):
 
     @staticmethod
     def get_seekfile(
-            logfile_pattern, seekfile_directory,
-            logfile, trace_inode=False, seekfile_tag=''):
+            logfile_pattern, state_directory, logfile,
+            trace_inode=False, tag=''):
         """make filename of seekfile from logfile and get the filename."""
         prefix = None
         filename = None
         if trace_inode:
             filename = (str(os.stat(logfile).st_ino) +
-                        seekfile_tag + LogChecker.SUFFIX_SEEK_WITH_INODE)
+                        tag + LogChecker.SUFFIX_SEEK_WITH_INODE)
             prefix = LogChecker.get_digest(logfile_pattern)
         else:
             filename = (re.sub(r'[^-0-9A-Za-z]', '_', logfile) +
-                        seekfile_tag + LogChecker.SUFFIX_SEEK)
-        if prefix is not None:
+                        tag + LogChecker.SUFFIX_SEEK)
+        if prefix:
             filename = prefix + '.' + filename
-        seekfile = os.path.join(seekfile_directory, filename)
+        seekfile = os.path.join(state_directory, filename)
         return seekfile
 
     @staticmethod
@@ -589,21 +606,30 @@ class LogChecker(object):
         return offset
 
     @staticmethod
-    def get_prefix_datafile(seekfile, seekfile_directory, seekfile_tag=''):
-        """Make the prefix of the file name for data files."""
-        directory = None
-        if seekfile_directory:
-            directory = seekfile_directory
-        elif seekfile:
-            directory = os.path.dirname(seekfile)
+    def get_cache_filename(state_directory, tag=''):
+        """Return the file name of cache file."""
         filename_elements = []
-        filename_elements.append(LogChecker.PREFIX_DATA)
-        if seekfile_tag:
+        filename_elements.append(LogChecker.PREFIX_STATE)
+        if tag:
             filename_elements.append(".")
-            filename_elements.append(seekfile_tag)
-        filename = "".join(filename_elements)
-        prefix_datafile = os.path.join(directory, filename)
-        return prefix_datafile
+            filename_elements.append(tag)
+        filename_elements.append(LogChecker.SUFFIX_CACHE)
+        cache_filename = os.path.join(
+            state_directory, "".join(filename_elements))
+        return cache_filename
+
+    @staticmethod
+    def get_lock_filename(state_directory, tag=''):
+        """Return the file name of lock file."""
+        filename_elements = []
+        filename_elements.append(LogChecker.PREFIX_STATE)
+        if tag:
+            filename_elements.append(".")
+            filename_elements.append(tag)
+        filename_elements.append(LogChecker.SUFFIX_LOCK)
+        lock_filename = os.path.join(
+            state_directory, "".join(filename_elements))
+        return lock_filename
 
     @staticmethod
     def lock(lockfile):
@@ -664,7 +690,8 @@ def _make_parser():
     parser = argparse.ArgumentParser(
         description=("A log file regular expression-based parser plugin "
                      "for Nagios."),
-        usage="%(prog)s [option ...]")
+        usage=("%(prog)s [options] [-p <pattern>|-P <filename>] "
+               "-l <filename> -S <directory>"))
     parser.add_argument(
         "--version",
         action="version",
@@ -674,6 +701,7 @@ def _make_parser():
         "-l", "--logfile",
         action="store",
         dest="logfile_pattern",
+        required=True,
         metavar="<filename>",
         help=("The pattern of log files to be scanned. "
               "The metacharacter * and ? are allowed. "
@@ -697,30 +725,31 @@ def _make_parser():
         action="store",
         dest="seekfile",
         metavar="<filename>",
-        help=("The file to store the seek position of the last scan. "
-              "If check multiple log files, ignore this option. "
-              "Use -S seekfile_directory.")
+        help=("Deprecated. Use -S option. "
+              "The file to store the seek position of the last scan. "
+              "If check multiple log files, ignore this option. ")
     )
     parser.add_argument(
-        "-S", "--seekfile-directory",
+        "-S", "--state-directory", "--seekfile-directory",
         action="store",
-        dest="seekfile_directory",
-        metavar="<seekfile_directory>",
-        help=("The directory of files to store the seek position "
-              "of the last scan. "
-              "If check multiple log files, require this option.")
+        dest="state_directory",
+        metavar="<directory>",
+        help=("The directory that store seek files, cache file and lock file. "
+              "If check multiple log files, require this option. "
+              "'--seekfile-directory' is for backwards compatibility.")
     )
     parser.add_argument(
-        "-T", "--seekfile-tag",
+        "-T", "--tag", "--seekfile-tag",
         action="store",
-        dest="seekfile_tag",
+        dest="tag",
         default="",
-        metavar="<seekfile_tag>",
-        help=("Add a tag in the seek files names, to prevent names "
+        metavar="<tag>",
+        help=("Add a tag in the file names of state files, to prevent names "
               "collisions. "
               "Useful to avoid maintaining many '-S' temporary directories "
               "when you check the same files several times with different "
-              "args.")
+              "args. "
+              "'--seekfile-tag' is for backwards compatibility.")
     )
     parser.add_argument(
         "-I", "--trace-inode",
@@ -775,7 +804,8 @@ def _make_parser():
         metavar="<filename>",
         help=("Specify a file with regular expressions "
               "which all will be skipped except as critical pattern, "
-              "one per line.")
+              "one per line. "
+              "'-f' is for backwards compatibility.")
     )
     parser.add_argument(
         "--critical-negpattern",
@@ -925,63 +955,65 @@ def _check_parser_args(parser):
 
     # check args
     if not args.logfile_pattern:
-        parser.error("option -l, --logfile is required.")
-        sys.exit(LogChecker.STATE_UNKNOWN)
-    if args.seekfile and args.seekfile_directory:
-        parser.error(
-            "option '-s, --seekfile' and '-S, --seekfile-directory' are "
-            "incompatible."
-            "If check multiple log files, Use -S. "
-            "If check a single log file, Use -s or -S.")
-        sys.exit(LogChecker.STATE_UNKNOWN)
+        parser.exit(
+            LogChecker.STATE_UNKNOWN,
+            "the following arguments are required: -l/--logfile")
 
-    is_multiple_logfiles = LogChecker.is_multiple_logfiles(
-        args.logfile_pattern)
-    if is_multiple_logfiles:
-        if args.seekfile:
-            parser.error(
-                "If check multiple log files, "
-                "option `-s, --seekfile` cannot be specified.")
-            sys.exit(LogChecker.STATE_UNKNOWN)
-        if not args.seekfile_directory:
-            parser.error(
-                "If check multiple log files, "
-                "option `-S, --seekfile-directory` is required.")
-            sys.exit(LogChecker.STATE_UNKNOWN)
-        # check directory
-        if not os.path.isdir(args.seekfile_directory):
-            parser.error("seekfile directory is not found: {0}".format(
-                args.seekfile_directory))
-            sys.exit(LogChecker.STATE_UNKNOWN)
+    if args.state_directory:
+        if not os.path.isdir(args.state_directory):
+            parser.exit(
+                LogChecker.STATE_UNKNOWN,
+                "the state directory is not found: {0}".format(
+                    args.state_directory))
+        if (args.seekfile and
+                os.path.dirname(args.seekfile) != args.state_directory):
+            parser.exit(
+                LogChecker.STATE_UNKNOWN,
+                "the seek file is outside the state directory: {0}".format(
+                    args.seekfile))
     else:
-        if not args.seekfile and not args.seekfile_directory:
-            parser.error(
-                "option `-S, --seekfile-directory` or "
-                "`-s, --seekfile` is required.")
-            sys.exit(LogChecker.STATE_UNKNOWN)
-        # check file or directory
-        if (args.seekfile_directory and
-                not os.path.isdir(args.seekfile_directory)):
-            parser.error("seekfile directory is not found: {0}".format(
-                args.seekfile_directory))
-            sys.exit(LogChecker.STATE_UNKNOWN)
-        if args.seekfile and not os.path.isfile(args.logfile_pattern):
-            parser.error("logfile is not found: {0}".format(
-                args.logfile_pattern))
-            sys.exit(LogChecker.STATE_UNKNOWN)
+        if args.seekfile:
+            state_directory = os.path.dirname(args.seekfile)
+            if not os.path.isdir(state_directory):
+                parser.exit(
+                    LogChecker.STATE_UNKNOWN,
+                    "the state directory is not found: {0}".format(
+                        state_directory))
+        else:
+            parser.exit(
+                LogChecker.STATE_UNKNOWN,
+                "the following arguments are required: -S/--state-directory")
+
+    if args.seekfile:
+        if LogChecker.is_multiple_logfiles(args.logfile_pattern):
+            parser.exit(
+                LogChecker.STATE_UNKNOWN,
+                "If check multiple log files, use arguments -s/--seekfile.")
+        else:
+            if not os.path.isfile(args.logfile_pattern):
+                parser.exit(
+                    LogChecker.STATE_UNKNOWN,
+                    "the log file is not found: {0}".format(
+                        args.logfile_pattern))
 
     pattern_list = LogChecker.get_pattern_list(args.pattern, args.patternfile)
     critical_pattern_list = LogChecker.get_pattern_list(
         args.critical_pattern, args.critical_patternfile)
     if not pattern_list and not critical_pattern_list:
-        parser.error("any valid pattern does not found")
-        sys.exit(LogChecker.STATE_UNKNOWN)
+        parser.exit(
+            LogChecker.STATE_UNKNOWN,
+            "any valid patterns are not found.")
 
     return args
 
 
 def _generate_config(args):
     """Generate initial data."""
+    if args.seekfile and not args.state_directory:
+        state_directory = os.path.dirname(args.seekfile)
+    else:
+        state_directory = args.state_directory
+
     # make pattern list
     pattern_list = LogChecker.get_pattern_list(args.pattern, args.patternfile)
     critical_pattern_list = LogChecker.get_pattern_list(
@@ -994,6 +1026,7 @@ def _generate_config(args):
     # set value of args
     config = {
         "logformat": args.logformat,
+        "state_directory": state_directory,
         "pattern_list": pattern_list,
         "critical_pattern_list": critical_pattern_list,
         "negpattern_list": negpattern_list,
@@ -1019,12 +1052,11 @@ def main():
     """Main function."""
     parser = _make_parser()
     args = _check_parser_args(parser)
-
     config = _generate_config(args)
     log = LogChecker(config)
-    log.check(args.logfile_pattern, args.seekfile,
-              args.seekfile_directory, args.remove_seekfile,
-              args.seekfile_tag)
+    log.check(
+        args.logfile_pattern, seekfile=args.seekfile,
+        remove_seekfile=args.remove_seekfile, tag=args.tag)
     state = log.get_state()
     print(log.get_message())
     sys.exit(state)

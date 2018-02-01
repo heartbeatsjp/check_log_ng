@@ -53,8 +53,10 @@ https://github.com/heartbeatsjp/check_log_ng/wiki
 
 ## Usage
 
+### Help
+
 ```
-usage: check_log_ng.py [option ...]
+usage: check_log_ng.py [options] [-p <pattern>|-P <filename>] -l <filename> -S <directory>
 
 A log file regular expression-based parser plugin for Nagios.
 
@@ -72,18 +74,20 @@ optional arguments:
                         %e, %H, %M, %S, %F and %T of strftime(3). (default:
                         the regular expression for syslog.
   -s <filename>, --seekfile <filename>
-                        The temporary file to store the seek position of the
-                        last scan. If check multiple log files, ignore this
-                        option. Use -S seekfile_directory.
-  -S <seekfile_directory>, --seekfile-directory <seekfile_directory>
-                        The directory of the temporary file to store the seek
+                        Deprecated. Use -S option. The file to store the seek
                         position of the last scan. If check multiple log
-                        files, require this option.
-  -T <seekfile_tag>, --seekfile-tag <seekfile_tag>
-                        Add a tag in the seek files names, to prevent names
-                        collisions. Useful to avoid maintaining many '-S'
-                        temporary directories when you check the same files
-                        several times with different args.
+                        files, ignore this option.
+  -S <directory>, --state-directory <directory>, --seekfile-directory <directory>
+                        The directory that store seek files, cache file and
+                        lock file. If check multiple log files, require this
+                        option. '--seekfile-directory' is for backwards
+                        compatibility.
+  -T <tag>, --tag <tag>, --seekfile-tag <tag>
+                        Add a tag in the file names of state files, to prevent
+                        names collisions. Useful to avoid maintaining many
+                        '-S' temporary directories when you check the same
+                        files several times with different args. '--seekfile-
+                        tag' is for backwards compatibility.
   -I, --trace-inode     Trace the inode of log files. If set, use inode
                         information as a seek file.
   -p <pattern>, --pattern <pattern>
@@ -102,6 +106,7 @@ optional arguments:
   -N <filename>, -f <filename>, --negpatternfile <filename>
                         Specify a file with regular expressions which all will
                         be skipped except as critical pattern, one per line.
+                        '-f' is for backwards compatibility.
   --critical-negpattern <pattern>
                         The regular expression to skip in the log file.
   --critical-negpatternfile <filename>
@@ -133,7 +138,7 @@ optional arguments:
   -R, --remove-seekfile
                         Remove expired seek files. See also --expiration.
   -M, --multiline       Consider multiple lines with same key as one log
-                        output. See also --multiline.
+                        output. See also --format.
   --cache               Cache the result for the period specified by the
                         option --cachetime.
   --cachetime <seconds>
