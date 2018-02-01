@@ -79,6 +79,7 @@ class LogCheckerTestCase(unittest.TestCase):
         self.lockfile = LogChecker.get_lock_filename(self.STATEDIR)
 
         # configuration
+        # Set cachetime to 0 for convenience in testing.
         self.config = {
             "logformat": LogChecker.FORMAT_SYSLOG,
             "state_directory": self.STATEDIR,
@@ -96,8 +97,7 @@ class LogCheckerTestCase(unittest.TestCase):
             "multiline": False,
             "scantime": 86400,
             "expiration": 691200,
-            "cache": False,
-            "cachetime": 60,
+            "cachetime": 0,
             "lock_timeout": 3
         }
 
@@ -727,11 +727,10 @@ class LogCheckerTestCase(unittest.TestCase):
         self.assertTrue(seekfile_1.find(self.tag1))
         self.assertTrue(os.path.exists(seekfile_3))
 
-    def test_cache(self):
-        """--cache
+    def test_cachetime(self):
+        """--cachetime
         """
         self.config["pattern_list"] = ["ERROR"]
-        self.config["cache"] = True
         self.config["cachetime"] = 2
         log = LogChecker(self.config)
 
