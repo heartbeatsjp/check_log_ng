@@ -648,7 +648,8 @@ class LogChecker(object):
         if lockfileobj is None:
             return False
         lockfileobj.close()
-        os.unlink(lockfile)
+        if os.path.isfile(lockfile):
+            os.unlink(lockfile)
         return True
 
     @staticmethod
