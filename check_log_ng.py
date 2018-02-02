@@ -914,20 +914,6 @@ def _make_parser():
         help=("Consider multiple lines with same key as one log output. "
               "See also --format.")
     )
-    # Since the caching feature is enabled by default,
-    # --cache option is ignored.
-    parser.add_argument(
-        "--cache",
-        action="store_true",
-        dest="cache",
-        default=True,
-        help=("Cache the result for the period specified by the option "
-              "--cachetime. "
-              "Since the caching feature is enabled by default, "
-              "you do not need to set this option to use it. "
-              "If you want to disable it, set '--cachetime=0'. "
-              "This option is for backwards compatibility. ")
-    )
     parser.add_argument(
         "--cachetime",
         action="store",
