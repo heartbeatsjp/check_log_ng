@@ -75,8 +75,6 @@ class LogChecker(object):
         self.config['encoding'] = 'utf-8'
         self.config['warning'] = 1
         self.config['critical'] = 0
-        self.config['nodiff_warn'] = False
-        self.config['nodiff_crit'] = False
         self.config['trace_inode'] = False
         self.config['multiline'] = False
         self.config['scantime'] = 86400
