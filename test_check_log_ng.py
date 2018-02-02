@@ -91,8 +91,6 @@ class LogCheckerTestCase(unittest.TestCase):
             "encoding": "utf-8",
             "warning": 1,
             "critical": 0,
-            "nodiff_warn": False,
-            "nodiff_crit": False,
             "trace_inode": False,
             "multiline": False,
             "scantime": 86400,

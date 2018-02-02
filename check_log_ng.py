@@ -75,8 +75,6 @@ class LogChecker(object):
         self.config['encoding'] = 'utf-8'
         self.config['warning'] = 1
         self.config['critical'] = 0
-        self.config['nodiff_warn'] = False
-        self.config['nodiff_crit'] = False
         self.config['trace_inode'] = False
         self.config['multiline'] = False
         self.config['scantime'] = 86400
@@ -859,24 +857,6 @@ def _make_parser():
               " (default: %(default)s)")
     )
     parser.add_argument(
-        "-d", "--nodiff-warn",
-        action="store_true",
-        dest="nodiff_warn",
-        default=False,
-        help=("Return WARNING "
-              "if the log file was not written to since the last scan."
-              " (not implemented)")
-    )
-    parser.add_argument(
-        "-D", "--nodiff-crit",
-        action="store_true",
-        dest="nodiff_crit",
-        default=False,
-        help=("Return CRITICAL "
-              "if the log was not written to since the last scan."
-              " (not impremented)")
-    )
-    parser.add_argument(
         "-t", "--scantime",
         action="store",
         type=int,
@@ -1028,8 +1008,6 @@ def _generate_config(args):
         "encoding": args.encoding,
         "warning": args.warning,
         "critical": args.critical,
-        "nodiff_warn": args.nodiff_warn,
-        "nodiff_crit": args.nodiff_crit,
         "trace_inode": args.trace_inode,
         "multiline": args.multiline,
         "scantime": args.scantime,

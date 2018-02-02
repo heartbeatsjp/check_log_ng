@@ -124,10 +124,6 @@ optional arguments:
                         Return CRITICAL if at least this many matches found.
                         i.e. don't return critical alerts unless specified
                         explicitly. (default: 0)
-  -d, --nodiff-warn     Return WARNING if the log file was not written to
-                        since the last scan. (not implemented)
-  -D, --nodiff-crit     Return CRITICAL if the log was not written to since
-                        the last scan. (not impremented)
   -t <seconds>, --scantime <seconds>
                         The range of time to scan. The log files older than
                         this time are not scanned. (default: 86400)
