@@ -21,7 +21,7 @@ import warnings
 import argparse
 
 # Globals
-CHECK_LOG_NG_VERSION = '2.0.0'
+CHECK_LOG_NG_VERSION = '2.0.1'
 
 
 class LogChecker(object):
@@ -81,7 +81,6 @@ class LogChecker(object):
         self.config['multiline'] = False
         self.config['scantime'] = 86400
         self.config['expiration'] = 691200
-        self.config['cache'] = False
         self.config['cachetime'] = 60
         self.config['lock_timeout'] = 3
 
@@ -360,19 +359,18 @@ class LogChecker(object):
     def check(
             self, logfile_pattern, seekfile=None,
             remove_seekfile=False, tag=''):
-        """Execute check_log_multi or check_log.
+        """Check log files.
         If cache is enabled and exists, return cache.
         """
-        if self.config['cache']:
-            cachefile = LogChecker.get_cache_filename(
-                self.config['state_directory'], tag)
+        cachefile = LogChecker.get_cache_filename(
+            self.config['state_directory'], tag)
         lockfile = LogChecker.get_lock_filename(
             self.config['state_directory'], tag)
         locked = False
         cur_time = time.time()
         timeout_time = cur_time + self.config['lock_timeout']
         while cur_time < timeout_time:
-            if self.config['cache']:
+            if self.config['cachetime'] > 0:
                 state, message = self._get_cache(cachefile)
                 if state != LogChecker.STATE_NO_CACHE:
                     self.state = state
@@ -403,7 +401,7 @@ class LogChecker(object):
                     trace_inode=self.config['trace_inode'], tag=tag)
             self._check_log(logfile_pattern, seekfile)
 
-        if self.config['cache']:
+        if self.config['cachetime'] > 0:
             self._update_cache(cachefile)
 
         LogChecker.unlock(lockfile, lockfileobj)
@@ -917,21 +915,15 @@ def _make_parser():
               "See also --format.")
     )
     parser.add_argument(
-        "--cache",
-        action="store_true",
-        dest="cache",
-        default=False,
-        help=("Cache the result for the period specified by the option "
-              "--cachetime.")
-    )
-    parser.add_argument(
         "--cachetime",
         action="store",
         type=int,
         dest="cachetime",
         default=60,
         metavar="<seconds>",
-        help="The period to cache the result. (default: %(default)s)"
+        help=("The period to cache the result. "
+              "If you want to disable this cache feature, set '0'. "
+              "(default: %(default)s)")
     )
     parser.add_argument(
         "--lock-timeout",
@@ -1042,7 +1034,6 @@ def _generate_config(args):
         "multiline": args.multiline,
         "scantime": args.scantime,
         "expiration": args.expiration,
-        "cache": args.cache,
         "cachetime": args.cachetime,
         "lock_timeout": args.lock_timeout
     }
