@@ -21,7 +21,7 @@ import warnings
 import argparse
 
 # Globals
-CHECK_LOG_NG_VERSION = '2.0.1'
+__version__ = '2.0.1'
 
 
 class LogChecker(object):
@@ -692,7 +692,7 @@ def _make_parser():
     parser.add_argument(
         "--version",
         action="version",
-        version="%(prog)s {0}".format(CHECK_LOG_NG_VERSION)
+        version="%(prog)s {0}".format(__version__)
     )
     parser.add_argument(
         "-l", "--logfile",
