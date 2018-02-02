@@ -859,24 +859,6 @@ def _make_parser():
               " (default: %(default)s)")
     )
     parser.add_argument(
-        "-d", "--nodiff-warn",
-        action="store_true",
-        dest="nodiff_warn",
-        default=False,
-        help=("Return WARNING "
-              "if the log file was not written to since the last scan."
-              " (not implemented)")
-    )
-    parser.add_argument(
-        "-D", "--nodiff-crit",
-        action="store_true",
-        dest="nodiff_crit",
-        default=False,
-        help=("Return CRITICAL "
-              "if the log was not written to since the last scan."
-              " (not impremented)")
-    )
-    parser.add_argument(
         "-t", "--scantime",
         action="store",
         type=int,
