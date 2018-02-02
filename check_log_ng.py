@@ -1010,8 +1010,6 @@ def _generate_config(args):
         "encoding": args.encoding,
         "warning": args.warning,
         "critical": args.critical,
-        "nodiff_warn": args.nodiff_warn,
-        "nodiff_crit": args.nodiff_crit,
         "trace_inode": args.trace_inode,
         "multiline": args.multiline,
         "scantime": args.scantime,
