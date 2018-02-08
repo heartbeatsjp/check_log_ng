@@ -370,15 +370,18 @@ class LogChecker(object):
                 continue
             value = self.config[key]
             if isinstance(value, list):
-                strings.extend(value)
+                strings.append(
+                    "{0}={1}".format(key, "\t".join(value)))
             elif isinstance(value, bool):
-                strings.append(LogChecker.to_unicode(str(value)))
+                strings.append(
+                    "{0}={1}".format(key, LogChecker.to_unicode(str(value))))
             elif isinstance(value, int):
-                strings.append(LogChecker.to_unicode(str(value)))
+                strings.append(
+                    "{0}={1}".format(key, LogChecker.to_unicode(str(value))))
             else:
-                strings.append(value)
+                strings.append("{0}={1}".format(key, value))
         strings.append(logfile_pattern)
-        digest_condition = LogChecker.get_digest('\t'.join(strings))
+        digest_condition = LogChecker.get_digest('\n'.join(strings))
         return digest_condition
 
     def _create_cache_filename(self, logfile_pattern, tag=''):
