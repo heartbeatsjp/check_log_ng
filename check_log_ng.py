@@ -21,7 +21,7 @@ import warnings
 import argparse
 
 # Globals
-__version__ = '2.0.1'
+__version__ = '2.0.2'
 
 
 class LogChecker(object):
@@ -42,7 +42,6 @@ class LogChecker(object):
     SUFFIX_SEEK_WITH_INODE = ".inode.seek"
     SUFFIX_CACHE = ".cache"
     SUFFIX_LOCK = ".lock"
-    PREFIX_STATE = "check_log_ng"
     RETRY_PERIOD = 0.5
     LOGFORMAT_EXPANSION_LIST = [
         {'%%': '_PERCENT_'},
@@ -84,15 +83,25 @@ class LogChecker(object):
 
         # overwrite values with user's values
         for key in self.config:
-            if key in config:
-                self.config[key] = config[key]
+            if key not in config:
+                continue
+            value = config[key]
+            if isinstance(value, bool) or isinstance(value, int):
+                pass
+            elif isinstance(value, list):
+                value = [LogChecker.to_unicode(x) for x in value]
+            else:
+                # On python 2.x, str, unicode or None reaches.
+                # On python 3.x, bytes, str or None reaches.
+                value = LogChecker.to_unicode(value)
+            self.config[key] = value
 
         self.pattern_flags = 0
         if self.config['case_insensitive']:
             self.pattern_flags = re.IGNORECASE
 
         self.re_logformat = re.compile(LogChecker.expand_logformat_by_strftime(
-            LogChecker.to_unicode(self.config['logformat'])))
+            self.config['logformat']))
 
         # status variables
         self.state = None
@@ -143,7 +152,6 @@ class LogChecker(object):
         for pattern in pattern_list:
             if not pattern:
                 continue
-            pattern = LogChecker.to_unicode(pattern)
             matchobj = re.search(pattern, message, self.pattern_flags)
             if matchobj:
                 _debug("{0}: '{1}' found".format(pattern_type, pattern))
@@ -354,16 +362,66 @@ class LogChecker(object):
         fileobj.close()
         return end_position
 
+    def _create_digest_condition(self, logfile_pattern):
+        """Create the digest of search conditions."""
+        strings = []
+        for key in sorted(self.config):
+            if key in ['expiration', 'cachetime', 'lock_timeout']:
+                continue
+            value = self.config[key]
+            if isinstance(value, list):
+                strings.append(
+                    "{0}={1}".format(key, "\t".join(value)))
+            elif isinstance(value, bool):
+                strings.append(
+                    "{0}={1}".format(key, LogChecker.to_unicode(str(value))))
+            elif isinstance(value, int):
+                strings.append(
+                    "{0}={1}".format(key, LogChecker.to_unicode(str(value))))
+            else:
+                strings.append("{0}={1}".format(key, value))
+        strings.append(logfile_pattern)
+        digest_condition = LogChecker.get_digest('\n'.join(strings))
+        return digest_condition
+
+    def _create_cache_filename(self, logfile_pattern, tag=''):
+        """Return the file name of cache file."""
+        digest_condition = self._create_digest_condition(logfile_pattern)
+        filename_elements = []
+        filename_elements.append(digest_condition)
+        if tag:
+            filename_elements.append(".")
+            filename_elements.append(tag)
+        filename_elements.append(LogChecker.SUFFIX_CACHE)
+        cache_filename = os.path.join(
+            self.config['state_directory'], "".join(filename_elements))
+        return cache_filename
+
+    def _create_lock_filename(self, logfile_pattern, tag=''):
+        """Return the file name of lock file."""
+        digest_condition = self._create_digest_condition(logfile_pattern)
+        filename_elements = []
+        filename_elements.append(digest_condition)
+        if tag:
+            filename_elements.append(".")
+            filename_elements.append(tag)
+        filename_elements.append(LogChecker.SUFFIX_LOCK)
+        lock_filename = os.path.join(
+            self.config['state_directory'], "".join(filename_elements))
+        return lock_filename
+
     def check(
             self, logfile_pattern, seekfile=None,
             remove_seekfile=False, tag=''):
         """Check log files.
         If cache is enabled and exists, return cache.
         """
-        cachefile = LogChecker.get_cache_filename(
-            self.config['state_directory'], tag)
-        lockfile = LogChecker.get_lock_filename(
-            self.config['state_directory'], tag)
+        logfile_pattern = LogChecker.to_unicode(logfile_pattern)
+        seekfile = LogChecker.to_unicode(seekfile)
+        tag = LogChecker.to_unicode(tag)
+        cachefile = self._create_cache_filename(logfile_pattern, tag=tag)
+        lockfile = self._create_lock_filename(logfile_pattern, tag=tag)
+
         locked = False
         cur_time = time.time()
         timeout_time = cur_time + self.config['lock_timeout']
@@ -415,6 +473,7 @@ class LogChecker(object):
     def _check_log(self, logfile, seekfile):
         """Check the log file."""
         _debug("logfile='{0}', seekfile='{1}'".format(logfile, seekfile))
+        logfile = LogChecker.to_unicode(logfile)
         if not os.path.exists(logfile):
             return
 
@@ -440,12 +499,12 @@ class LogChecker(object):
 
         if found:
             self.found.extend(found)
-            self.found_messages.append("{0} at {1}".format(
-                ','.join(found), LogChecker.to_unicode(logfile)))
+            self.found_messages.append(
+                "{0} at {1}".format(','.join(found), logfile))
         if critical_found:
             self.critical_found.extend(critical_found)
-            self.critical_found_messages.append("{0} at {1}".format(
-                ','.join(critical_found), LogChecker.to_unicode(logfile)))
+            self.critical_found_messages.append(
+                "{0} at {1}".format(','.join(critical_found), logfile))
 
         LogChecker.update_seekfile(seekfile, end_position)
         return
@@ -534,12 +593,17 @@ class LogChecker(object):
         os.rename(tmp_cachefile, cachefile)
         return True
 
+    def _remove_cache(self, cachefile):
+        """Remove the cache file."""
+        if os.path.isfile(cachefile):
+            os.unlink(cachefile)
+
     @staticmethod
     def get_pattern_list(pattern_string, pattern_filename):
         """Get the pattern list."""
         pattern_list = []
         if pattern_string:
-            pattern_list.append(LogChecker.to_unicode(pattern_string))
+            pattern_list.append(pattern_string)
         if pattern_filename:
             if os.path.isfile(pattern_filename):
                 lines = []
@@ -602,32 +666,6 @@ class LogChecker(object):
         return offset
 
     @staticmethod
-    def get_cache_filename(state_directory, tag=''):
-        """Return the file name of cache file."""
-        filename_elements = []
-        filename_elements.append(LogChecker.PREFIX_STATE)
-        if tag:
-            filename_elements.append(".")
-            filename_elements.append(tag)
-        filename_elements.append(LogChecker.SUFFIX_CACHE)
-        cache_filename = os.path.join(
-            state_directory, "".join(filename_elements))
-        return cache_filename
-
-    @staticmethod
-    def get_lock_filename(state_directory, tag=''):
-        """Return the file name of lock file."""
-        filename_elements = []
-        filename_elements.append(LogChecker.PREFIX_STATE)
-        if tag:
-            filename_elements.append(".")
-            filename_elements.append(tag)
-        filename_elements.append(LogChecker.SUFFIX_LOCK)
-        lock_filename = os.path.join(
-            state_directory, "".join(filename_elements))
-        return lock_filename
-
-    @staticmethod
     def lock(lockfile):
         """Lock."""
         lockfileobj = io.open(lockfile, mode='w')
@@ -652,8 +690,9 @@ class LogChecker(object):
     def get_digest(string):
         """Get digest string."""
         hashobj = hashlib.sha1()
-        hashobj.update(string.encode('utf-8'))
-        digest = base64.urlsafe_b64encode(hashobj.digest()).decode('utf-8')
+        hashobj.update(LogChecker.to_bytes(string))
+        digest = LogChecker.to_unicode(
+            base64.urlsafe_b64encode(hashobj.digest()))
         return digest
 
     @staticmethod
@@ -671,10 +710,25 @@ class LogChecker(object):
         """Convert str to unicode"""
         if sys.version_info >= (3,):
             if isinstance(string, bytes):
+                # convert bytes to str.
                 return string.decode('utf-8')
         else:
             if isinstance(string, str):
+                # convert str to unicode.
                 return string.decode('utf-8')
+        return string
+
+    @staticmethod
+    def to_bytes(string):
+        """Convert str to bytes"""
+        if sys.version_info >= (3,):
+            if isinstance(string, str):
+                # convert str to bytes.
+                return string.encode('utf-8')
+        else:
+            if not isinstance(string, str):
+                # convert unicode to str.
+                return string.encode('utf-8')
         return string
 
 

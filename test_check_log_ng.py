@@ -9,6 +9,7 @@ from __future__ import unicode_literals
 import unittest
 import warnings
 import os
+import glob
 import io
 import time
 import datetime
@@ -74,9 +75,8 @@ class LogCheckerTestCase(unittest.TestCase):
         self.seekfile2 = LogChecker.get_seekfile(
             self.logfile_pattern, self.STATEDIR, self.logfile2)
 
-        # cache file and lock file
-        self.cachefile = LogChecker.get_cache_filename(self.STATEDIR)
-        self.lockfile = LogChecker.get_lock_filename(self.STATEDIR)
+        # lock file
+        self.lockfile = os.path.join(self.STATEDIR, 'check_log_ng.lock')
 
         # configuration
         # Set cachetime to 0 for convenience in testing.
@@ -100,30 +100,31 @@ class LogCheckerTestCase(unittest.TestCase):
         }
 
     def tearDown(self):
-        # remove seek files and log files.
-        if os.path.exists(self.seekfile):
-            os.unlink(self.seekfile)
+        # remove log files.
         for logfile in [self.logfile, self.logfile1, self.logfile2]:
-            if not os.path.exists(logfile):
-                continue
-            for trace_inode in [True, False]:
-                seekfile = LogChecker.get_seekfile(
-                    self.logfile_pattern, self.STATEDIR, logfile,
-                    trace_inode=trace_inode)
-                if os.path.exists(seekfile):
-                    os.unlink(seekfile)
-            for tag in [self.tag1, self.tag2]:
-                seekfile = LogChecker.get_seekfile(
-                    self.logfile_pattern, self.STATEDIR, logfile, tag=tag)
-                if os.path.exists(seekfile):
-                    os.unlink(seekfile)
-            os.unlink(logfile)
+            if os.path.exists(logfile):
+                os.unlink(logfile)
 
-        # remove cache file and lock file.
-        if os.path.exists(self.cachefile):
-            os.unlink(self.cachefile)
-        if os.path.exists(self.lockfile):
-            os.unlink(self.lockfile)
+        # remove seek files.
+        seekfiles = glob.glob(
+            os.path.join(self.STATEDIR, '*' + LogChecker.SUFFIX_SEEK))
+        for seekfile in seekfiles:
+            if os.path.exists(seekfile):
+                os.unlink(seekfile)
+
+        # remove a cache file.
+        cachefiles = glob.glob(
+            os.path.join(self.STATEDIR, '*' + LogChecker.SUFFIX_CACHE))
+        for cachefile in cachefiles:
+            if os.path.exists(cachefile):
+                os.unlink(cachefile)
+
+        # remove a lock file.
+        lockfiles = glob.glob(
+            os.path.join(self.STATEDIR, '*' + LogChecker.SUFFIX_LOCK))
+        for lockfile in lockfiles:
+            if os.path.exists(lockfile):
+                os.unlink(lockfile)
 
     def test_format(self):
         """--format option
@@ -732,6 +733,8 @@ class LogCheckerTestCase(unittest.TestCase):
         self.config["cachetime"] = 2
         log = LogChecker(self.config)
 
+        cachefile = log._create_cache_filename(self.logfile)
+
         # within cachetime
         # Dec  5 12:34:50 hostname test: ERROR
         line = self._make_line(self._get_timestamp(), "test", "ERROR")
@@ -755,7 +758,7 @@ class LogCheckerTestCase(unittest.TestCase):
             log.get_message(),
             self.MESSAGE_WARNING_ONE.format(line, self.logfile))
 
-        os.unlink(self.cachefile)
+        log._remove_cache(cachefile)
 
         # over cachetime
         # Dec  5 12:34:50 hostname test: ERROR
@@ -777,7 +780,7 @@ class LogCheckerTestCase(unittest.TestCase):
 
         self.assertEqual(log.get_state(), LogChecker.STATE_OK)
 
-        os.unlink(self.cachefile)
+        log._remove_cache(cachefile)
 
     def test_lock_timeout(self):
         """--lock-timeout
@@ -785,6 +788,8 @@ class LogCheckerTestCase(unittest.TestCase):
         self.config["pattern_list"] = ["ERROR"]
         self.config["lock_timeout"] = 6
         log = LogChecker(self.config)
+
+        lockfile = log._create_lock_filename(self.logfile)
 
         # within lock_timeout
         #   |time|sub        |main       |
@@ -804,9 +809,9 @@ class LogCheckerTestCase(unittest.TestCase):
         # locked by an another process
         locked_time = 4
         wait_interval = 0.1
-        proc = self._run_locked_subprocess(locked_time)
+        proc = self._run_locked_subprocess(lockfile, locked_time)
         for _ in range(100):
-            if os.path.isfile(self.lockfile):
+            if os.path.isfile(lockfile):
                 break
             time.sleep(wait_interval)
 
@@ -841,9 +846,9 @@ class LogCheckerTestCase(unittest.TestCase):
         # locked by an another process
         locked_time = 8
         wait_interval = 0.1
-        proc = self._run_locked_subprocess(locked_time)
+        proc = self._run_locked_subprocess(lockfile, locked_time)
         for _ in range(100):
-            if os.path.isfile(self.lockfile):
+            if os.path.isfile(lockfile):
                 break
             time.sleep(wait_interval)
 
@@ -859,46 +864,6 @@ class LogCheckerTestCase(unittest.TestCase):
         self.assertTrue(elapsed_time > self.config["lock_timeout"])
         self.assertTrue(elapsed_time < locked_time)
 
-    def test_get_cache_filename(self):
-        """LogChecker.get_cache_filename()
-        """
-        cache_filename = LogChecker.get_cache_filename(self.STATEDIR)
-        self.assertEqual(
-            cache_filename,
-            os.path.join(
-                self.STATEDIR,
-                "{0}{1}".format(LogChecker.PREFIX_STATE,
-                                LogChecker.SUFFIX_CACHE)))
-
-        cache_filename = LogChecker.get_cache_filename(
-            self.STATEDIR, self.tag1)
-        self.assertEqual(
-            cache_filename,
-            os.path.join(
-                self.STATEDIR,
-                "{0}.{1}{2}".format(LogChecker.PREFIX_STATE, self.tag1,
-                                    LogChecker.SUFFIX_CACHE)))
-
-    def test_get_lock_filename(self):
-        """LogChecker.get_lock_filename()
-        """
-        lock_filename = LogChecker.get_lock_filename(self.STATEDIR)
-        self.assertEqual(
-            lock_filename,
-            os.path.join(
-                self.STATEDIR,
-                "{0}{1}".format(LogChecker.PREFIX_STATE,
-                                LogChecker.SUFFIX_LOCK)))
-
-        lock_filename = LogChecker.get_lock_filename(
-            self.STATEDIR, self.tag1)
-        self.assertEqual(
-            lock_filename,
-            os.path.join(
-                self.STATEDIR,
-                "{0}.{1}{2}".format(LogChecker.PREFIX_STATE, self.tag1,
-                                    LogChecker.SUFFIX_LOCK)))
-
     def test_lock(self):
         """LogChecker.lock()
         """
@@ -910,7 +875,7 @@ class LogCheckerTestCase(unittest.TestCase):
         # locked by an another process
         locked_time = 4
         wait_interval = 0.1
-        proc = self._run_locked_subprocess(locked_time)
+        proc = self._run_locked_subprocess(self.lockfile, locked_time)
         for _ in range(100):
             if os.path.isfile(self.lockfile):
                 break
@@ -990,7 +955,7 @@ class LogCheckerTestCase(unittest.TestCase):
         fileobj.flush()
         fileobj.close()
 
-    def _run_locked_subprocess(self, sleeptime):
+    def _run_locked_subprocess(self, lockfile, sleeptime):
         code = (
             "import time\n"
             "from check_log_ng import LogChecker\n"
@@ -998,7 +963,7 @@ class LogCheckerTestCase(unittest.TestCase):
             "lockfileobj = LogChecker.lock(lockfile)\n"
             "time.sleep({1})\n"
             "LogChecker.unlock(lockfile, lockfileobj)\n"
-        ).format(self.lockfile, LogChecker.to_unicode(str(sleeptime)))
+        ).format(lockfile, LogChecker.to_unicode(str(sleeptime)))
         code = code.replace("\n", ";")
         proc = subprocess.Popen(['python', '-c', code])
         return proc
