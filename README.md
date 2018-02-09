@@ -4,59 +4,184 @@
 
 A log file regular expression-based parser plugin for Nagios.
 
+Features are as follows:
+
+- You can specify the character string you want to detect with regular expressions.
+- You can specify the character string you do not want to detect with regular expressions.
+- You can specify the character encoding of a log file.
+- You can check multiple log files at once and also check log-rotated files.
+- This script uses seek files which record the position where the check is completed for each log file. With these seek files, you can check only the differences from the last check.
+- You can check multiple lines outputed at once as one message.
+- The result can be cached within the specified time period. This will help multiple monitoring servers and multiple attempts.
+
+Originally, this script had be inspired by [`check_log3.pl`](https://exchange.nagios.org/directory/Plugins/Log-Files/check_log3-2Epl/details).
+Currentlly, this has different options.
+
+## Examples of usage
+
+### Pattern
+
+If you want to detect character strings, you can add `-p <pattern>` or `-P <filename>` option.
+
+~~~sh
+check_log_ng.py -p 'ERROR' -S /var/spool/check_log_ng -l '/var/log/messages'
+~~~
+
+Or
+
+~~~sh
+check_log_ng.py -P /path/to/pattern.txt -S /var/spool/check_log_ng -l '/var/log/messages'
+~~~
+
+~~~sh
+$ cat /path/to/pattern.txt
+ERROR
+FATAL
+~~~
+
+### Negative pattern
+
+If you have character strings not to detect, you can add `-n <pattern>` or `-N <filename>` option.
+
+~~~sh
+check_log_ng.py -p 'ERROR' -n 'no problem' -S /var/spool/check_log_ng -l '/var/log/messages'
+~~~
+
+Or
+
+~~~sh
+check_log_ng.py -P /path/to/pattern.txt -N /path/to/negpattern.txt -S /var/spool/check_log_ng -l '/var/log/messages'
+~~~
+
+~~~sh
+$ cat /path/to/negpattern.txt
+no problem
+information
+~~~
+
+### Case insensitive
+
+If you want to do a case insensitive scan, you can add `-i` option.
+
+~~~sh
+check_log_ng.py -i -p 'ERROR' -S /var/spool/check_log_ng -l '/var/log/messages'
+~~~
+
+### Multiple lines
+
+When output to multiple lines at the same time such as the following, you can add `-F <format>` and `-M` option.
+
+```
+2013/12/05 09:36:51,024 jobs-thread-5 ERROR ~ *** Called URI is: https://www.example.com/submit
+2013/12/05 09:36:51,024 jobs-thread-5 ERROR ~ *** Response code is: 500
+```
+
+~~~sh
+check_log_ng.py -F '^(%Y/%m/%d\s%T,\d+ \S+ \S+) (.*)$' -M -p 'ERROR' -S /var/spool/check_log_ng -l '/var/log/application.log'
+~~~
+
+This is considered a message like the following:
+
+```
+2013/12/05 09:36:51,024 jobs-thread-5 ERROR ~ *** Called URI is: https://www.example.com/submit ~ *** Response code is: 500
+```
+
+### Multiple monitoring items
+
+If you want use multiple monitoring items, you can add '-T <tag>' option to prevent name collisions of seek files.
+
+~~~sh
+check_log_ng.py -T 'log_error' -p 'ERROR' -S /var/spool/check_log_ng -l '/var/log/messages'
+~~~
+
+~~~sh
+check_log_ng.py -T 'log_block' -p 'BLOCK' -S /var/spool/check_log_ng -l '/var/log/messages'
+~~~
+
+### Monitoring interval
+
+If your monitoring interval is 180 seconds, you can add `--cachetime=180` option to cache the result within monitoring interval.
+It is useful for multiple monitoring servers.
+
+~~~sh
+check_log_ng.py --cachetime=180 -p 'ERROR' -S /var/spool/check_log_ng -l '/var/log/messages'
+~~~
+
+### Multiple log files
+
+If you want to check log-rotated files with the file name such as 'message.N' or 'message-YYYYMMDD', you can add `-I -R` options to trace inode informations.
+
+~~~sh
+check_log_ng.py -I -R -p 'ERROR' -S /var/spool/check_log_ng -l '/var/log/messages*'
+~~~
+
+If the log rotation period exceeds one week, you can add `-E <seconds>` option.
+This value must be longer than the log rotation period.
+If it is one month, you can add `-E 2764800`, which is 32 days.
+
+~~~sh
+check_log_ng.py -I -R -E 2764800 -p 'ERROR' -S /var/spool/check_log_ng -l '/var/log/messages*'
+~~~
+
+
 ## Requirement
 
 - Python 2.6, 2.7, 3.5 or 3.6.
-- On python 2.6, argparse module.
+- In python 2.6, argparse module.
 
 ## Installation
 
-Clone a copy of the main `check_log_ng` git repo and add execute permission.
+Clone a copy of the main `check_log_ng` git repository.
 
-```
-$ git@github.com:heartbeatsjp/check_log_ng.git
+~~~sh
+$ git clone git@github.com:heartbeatsjp/check_log_ng.git
 $ cd check_log_ng
+~~~
+
+Add execute permission.
+
+~~~sh
 $ chmod 755 check_log_ng.py
-```
-Copy this plugin to nagios-plugins directory.
+~~~
 
-```
-$ cp check_log_ng.py /usr/lib64/nagios/plugins/
-```
+Copy this plugin to a nagios-plugins directory.
 
-Create a directory to save a cache file, a lock file and seek files.
-Change the owner of the directory.
-```
+~~~sh
+$ sudo cp check_log_ng.py /usr/lib64/nagios/plugins/
+~~~
+
+Create a directory to store a cache file, a lock file and seek files.
+
+~~~sh
 $ sudo mkdir /var/spool/check_log_ng
-$ sudo chown nrpe:nrpe /var/spool/check_log_ng
-```
+~~~
 
-If root privilege is necessary to read log files, edit a  sudoers file.
+Change the owner of the directory to the user who will run nrpe.
+
+~~~sh
+$ sudo chown nrpe: /var/spool/check_log_ng
+~~~
+
+If root privilege is necessary to read log files, add the following lines to a sudoers file.
 
 ```
 Defaults:nrpe !requiretty
 nagios ALL=(root) NOPASSWD: /usr/lib64/nagios/plugins/check_log_ng.py
 ```
 
-If you run on python 2.6, install argparse module.
+If you use Python 2.6, install argparse module.
 If you use RHEL6/CentOS6, you can run:
 
-```
+~~~sh
 $ sudo yum install python-argparse
-```
-
-## Documentation
-
-Japanese Version Only...
-
-https://github.com/heartbeatsjp/check_log_ng/wiki
+~~~
 
 ## Usage
 
 ### Help
 
 ```
-usage: check_log_ng.py [options] [-p <pattern>|-P <filename>] -l <filename> -S <directory>
+usage: check_log_ng.py [options] [-p <pattern>|-P <filename>] -S <directory> -l <filename>
 
 A log file regular expression-based parser plugin for Nagios.
 
@@ -64,54 +189,56 @@ optional arguments:
   -h, --help            show this help message and exit
   --version             show program's version number and exit
   -l <filename>, --logfile <filename>
-                        The pattern of log files to be scanned. The
-                        metacharacter * and ? are allowed. If you want to set
-                        multiple patterns, set a space between patterns.
+                        The file names of log files to be scanned. The
+                        metacharacters * and ? are available. To set multiple
+                        files, set a space between file names. See also
+                        --scantime.
   -F <format>, --format <format>
-                        The regular expression of format of log to parse.
-                        Required two group, format of '^(TIMESTAMP and
-                        TAG)(.*)$'. Also, may use %%, %Y, %y, %a, %b, %m, %d,
-                        %e, %H, %M, %S, %F and %T of strftime(3). (default:
-                        the regular expression for syslog.
+                        Regular expression for log format. It requires two
+                        groups in format of '^(TIMESTAMP and TAG)(.*)$'. Also,
+                        it may use %%, %Y, %y, %a, %b, %m, %d, %e, %H, %M, %S,
+                        %F and %T of strftime(3). (default: regular expression
+                        for syslog.
   -s <filename>, --seekfile <filename>
-                        Deprecated. Use -S option. The file to store the seek
-                        position of the last scan. If check multiple log
-                        files, ignore this option.
+                        Deprecated. Use -S option instead. The file name of
+                        the file to store the seek position of the last scan.
   -S <directory>, --state-directory <directory>, --seekfile-directory <directory>
-                        The directory that store seek files, cache file and
-                        lock file. If check multiple log files, require this
-                        option. '--seekfile-directory' is for backwards
+                        The directory to store seek files, cache file and lock
+                        file. '--seekfile-directory' is for backwards
                         compatibility.
   -T <tag>, --tag <tag>, --seekfile-tag <tag>
                         Add a tag in the file names of state files, to prevent
                         names collisions. Useful to avoid maintaining many
-                        '-S' temporary directories when you check the same
-                        files several times with different args. '--seekfile-
-                        tag' is for backwards compatibility.
-  -I, --trace-inode     Trace the inode of log files. If set, use inode
-                        information as a seek file.
+                        '-S' directories when you check the same files several
+                        times with different args. '--seekfile-tag' is for
+                        backwards compatibility.
+  -I, --trace-inode     If set, trace the inode of the log file. After log
+                        rotatation, you can trace the log file.
   -p <pattern>, --pattern <pattern>
                         The regular expression to scan for in the log file.
   -P <filename>, --patternfile <filename>
-                        File containing regular expressions, one per line.
+                        The file name of the file containing regular
+                        expressions, one per line.
   --critical-pattern <pattern>
-                        The regular expression to scan for in the log file. In
-                        spite of --critical option, return CRITICAL.
+                        The regular expression to scan for in the log file. If
+                        found, return CRITICAL.
   --critical-patternfile <filename>
-                        File containing regular expressions, one per line. In
-                        spite of --critical option, return CRITICAL.
+                        The file name of the file containing regular
+                        expressions, one per line. If found, return CRITICAL.
   -n <pattern>, --negpattern <pattern>
-                        The regular expression to skip except as critical
-                        pattern in the log file.
+                        The regular expression which all will be skipped
+                        except as critical pattern in the log file.
   -N <filename>, -f <filename>, --negpatternfile <filename>
-                        Specify a file with regular expressions which all will
-                        be skipped except as critical pattern, one per line.
-                        '-f' is for backwards compatibility.
+                        The file name of the file containing regular
+                        expressions which all will be skipped except as
+                        critical pattern, one per line. '-f' is for backwards
+                        compatibility.
   --critical-negpattern <pattern>
-                        The regular expression to skip in the log file.
+                        The regular expression which all will be skipped in
+                        the log file.
   --critical-negpatternfile <filename>
-                        Specifiy a file with regular expressions which all
-                        will be skipped, one per line.
+                        The file name of the file containing regular
+                        expressions which all will be skipped, one per line.
   -i, --case-insensitive
                         Do a case insensitive scan.
   --encoding <encoding>
@@ -128,19 +255,19 @@ optional arguments:
                         The range of time to scan. The log files older than
                         this time are not scanned. (default: 86400)
   -E <seconds>, --expiration <seconds>
-                        The expiration of seek files. This value must be
-                        greater than period of log rotation when use with -R
-                        option. (default: 691200)
+                        The expiration of seek files. This must be longer than
+                        the log rotation period. The expired seek files are
+                        deleted with -R option. (default: 691200)
   -R, --remove-seekfile
                         Remove expired seek files. See also --expiration.
-  -M, --multiline       Consider multiple lines with same key as one log
-                        output. See also --format.
+  -M, --multiline       Treat multiple lines outputed at once as one message.
+                        See also --format.
   --cachetime <seconds>
-                        The period to cache the result. If you want to disable
-                        this cache feature, set '0'. (default: 60)
+                        The period to cache the result. To disable this cache
+                        feature, set '0'. (default: 60)
   --lock-timeout <seconds>
-                        If another proccess is running, wait for the period of
-                        this lock timeout. (default: 3)
+                        The period to wait for if another process is running.
+                        If timeout occurs, UNKNOWN is returned. (default: 3)
 ```
 
 ## Contributing
@@ -155,9 +282,9 @@ If you have a problem, please [create an issue](https://github.com/heartbeatsjp/
 
 If you debug this script, use -O option.
 
-```
+~~~sh
 python -O check_log_ng.py ...
-```
+~~~
 
 ## License
 
