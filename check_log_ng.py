@@ -1,8 +1,25 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-# Python 2.6, 2.7, 3.5, 3.6
-# Require argparse module on python 2.6.
-"""A log file regular expression-based parser plugin for Nagios."""
+"""A log file regular expression-based parser plugin for Nagios.
+
+Features are as follows:
+
+- You can specify the character string you want to detect with regular
+  expressions.
+- You can specify the character string you do not want to detect with
+  regular expressions.
+- You can specify the character encoding of a log file.
+- You can check multiple log files at once and also check log-rotated files.
+- This script uses seek files which record the position where the check is
+  completed for each log file.
+  With these seek files, you can check only the differences from the last check.
+- You can check multiple lines outputed at once as one message.
+- The result can be cached within the specified time period.
+  This will help multiple monitoring servers and multiple attempts.
+
+This module is available in Python 2.6, 2.7, 3.5, 3.6.
+Require argparse module in python 2.6.
+"""
 
 from __future__ import absolute_import
 from __future__ import division
@@ -25,7 +42,6 @@ __version__ = '2.0.2'
 
 
 class LogChecker(object):
-
     """LogChecker."""
 
     # Class constant
@@ -61,7 +77,37 @@ class LogChecker(object):
     ]
 
     def __init__(self, config):
-        """ Constructor."""
+        """Constructor.
+
+        The keys of configuration parameters are::
+
+            logformat (str): Regular expression for log format.
+            state_directory (str): The directory to store seek files, cache
+                file and lock file.
+            pattern_list (list): The list of regular expressions to scan for
+                in the log file.
+            critical_pattern_list (list): The list of regular expressions to
+                scan for in the log file. If found, return CRITICAL.
+            negpattern_list (list): The list of regular expressions which all
+                will be skipped except as critical pattern in the log file.
+            critical_negpattern_list (list): The list of regular expressions
+                which all will be skipped except as critical pattern in the
+                log file. If found, return CRITICAL.
+            case_insensitive (bool): Do a case insensitive scan.
+            encoding (str): Specify the character encoding in the log file.
+            warning (int): The number of times found that be needed to return WARNING.
+            critical (int): The number of times found that be needed to return CRITICAL.
+            trace_inode (bool): Trace the inode of the log file.
+            multiline (bool): Treat multiple lines outputed at once as one message.
+            scantime (int): The range of time to scan.
+            expiration (int): The expiration of seek files.
+            cachetime (int): The period to cache the result.
+            lock_timeout (int): The period to wait for if another process is running.
+
+        Args:
+            config (dict): The dictionary of configuration parameters.
+
+        """
         # set default value
         self.config = {}
         self.config['logformat'] = LogChecker.FORMAT_SYSLOG
@@ -414,7 +460,15 @@ class LogChecker(object):
             self, logfile_pattern, seekfile=None,
             remove_seekfile=False, tag=''):
         """Check log files.
+
         If cache is enabled and exists, return cache.
+
+        Args:
+            logfile_pattern (str): The file names of log files to be scanned.
+            seekfile (str, optional): The file name of the seek file.
+            remove_seekfile (bool, optional): If true, remove expired seek files.
+            tag (str, optional): The tag added in the file names of state files,
+                to prevent names collisions.
         """
         logfile_pattern = LogChecker.to_unicode(logfile_pattern)
         seekfile = LogChecker.to_unicode(seekfile)
@@ -465,13 +519,21 @@ class LogChecker(object):
 
     def check_log(self, logfile, seekfile):
         """Check the log file.
-        Deprecated. Use check().
+
+        deprecated:: 2.0.1
+        Use :func:`check` instead.
         """
         self.check(logfile, seekfile=seekfile)
         return
 
     def _check_log(self, logfile, seekfile):
-        """Check the log file."""
+        """Check the log file.
+
+        Args:
+            logfile (str): The file name of the log file to be scanned.
+            seekfile (str): The file name of the seek file.
+
+        """
         _debug("logfile='{0}', seekfile='{1}'".format(logfile, seekfile))
         logfile = LogChecker.to_unicode(logfile)
         if not os.path.exists(logfile):
@@ -513,13 +575,23 @@ class LogChecker(object):
             self, logfile_pattern, state_directory,
             remove_seekfile=False, tag=''):
         """Check the multiple log files.
-        Deprecated. Use check().
+
+        deprecated:: 2.0.1
+        Use :func:`check` instead.
         """
         state_directory = state_directory  # not used
         self.check(logfile_pattern, remove_seekfile=remove_seekfile, tag=tag)
 
     def _check_log_multi(self, logfile_pattern, remove_seekfile=False, tag=''):
-        """Check the multiple log files."""
+        """Check the multiple log files.
+
+        Args:
+            logfile_pattern (str): The file names of log files to be scanned.
+            remove_seekfile (bool, optional): If true, remove expired seek files.
+            tag (str, optional): The tag added in the file names of state files,
+                to prevent names collisions.
+
+        """
         logfile_list = self._get_logfile_list(logfile_pattern)
         for logfile in logfile_list:
             if not os.path.isfile(logfile):
@@ -549,6 +621,7 @@ class LogChecker(object):
 
     def get_state(self):
         """Get the state of the result.
+
         When get_state() or get_message() is executed,
         the state is retained until clear_state() is executed.
         """
@@ -558,6 +631,7 @@ class LogChecker(object):
 
     def get_message(self):
         """Get the message of the result.
+
         When get_state() or get_message() is executed,
         the message is retained until clear_state() is executed.
         """
@@ -600,7 +674,16 @@ class LogChecker(object):
 
     @staticmethod
     def get_pattern_list(pattern_string, pattern_filename):
-        """Get the pattern list."""
+        """Get the pattern list.
+
+        Args:
+            pattern_string (str): The pattern to scan for.
+            pattern_filename (str): The file name of file containing patterns.
+
+        Returns:
+            The list of patterns.
+
+        """
         pattern_list = []
         if pattern_string:
             pattern_list.append(pattern_string)
@@ -619,7 +702,15 @@ class LogChecker(object):
 
     @staticmethod
     def expand_logformat_by_strftime(logformat):
-        """Expand log format by strftime variables."""
+        """Expand log format by strftime variables.
+
+        Args:
+            logformat (str): The string of log format.
+
+        Returns:
+            The string expanded by strftime().
+
+        """
         for item in LogChecker.LOGFORMAT_EXPANSION_LIST:
             key = list(item)[0]
             logformat = logformat.replace(key, item[key])
@@ -629,7 +720,19 @@ class LogChecker(object):
     def get_seekfile(
             logfile_pattern, state_directory, logfile,
             trace_inode=False, tag=''):
-        """make filename of seekfile from logfile and get the filename."""
+        """Make filename of seekfile from logfile and get the filename.
+
+        Args:
+            logfile_pattern (str): The pattern of the file names of the log files.
+            state_directory (str): The state directory.
+            logfile (str): The file name of the log file.
+            trace_inode (bool): Whether it traces inode information.
+            tag (str): The tag.
+
+        Returns:
+            The file name of the seek file.
+
+        """
         prefix = None
         filename = None
         if trace_inode:
@@ -667,7 +770,16 @@ class LogChecker(object):
 
     @staticmethod
     def lock(lockfile):
-        """Lock."""
+        """Lock.
+
+        Args:
+            lockfile (str): The file name of the lock file.
+
+        Returns:
+            The instance of the object of the lock file.
+            If lock fails, return None.
+
+        """
         lockfileobj = io.open(lockfile, mode='w')
         try:
             fcntl.flock(lockfileobj, fcntl.LOCK_EX | fcntl.LOCK_NB)
@@ -678,7 +790,16 @@ class LogChecker(object):
 
     @staticmethod
     def unlock(lockfile, lockfileobj):
-        """Unlock."""
+        """Unlock.
+
+        Args:
+            lockfile (str): The file name of the lock file.
+            lockfileobj (file): The instance of the object of the lock file.
+
+        Returns:
+            True if unlock successes.
+
+        """
         if lockfileobj is None:
             return False
         lockfileobj.close()
@@ -688,7 +809,15 @@ class LogChecker(object):
 
     @staticmethod
     def get_digest(string):
-        """Get digest string."""
+        """Get digest string.
+
+        Args:
+            string (str): The string to be digested.
+
+        Returns:
+            The string of digest.
+
+        """
         hashobj = hashlib.sha1()
         hashobj.update(LogChecker.to_bytes(string))
         digest = LogChecker.to_unicode(
@@ -697,8 +826,14 @@ class LogChecker(object):
 
     @staticmethod
     def is_multiple_logfiles(logfile_pattern):
-        """If the string of the log file pattern is multiple log files,
-        return True.
+        """Whether the pattern of the log file names is multiple files.
+
+        Args:
+            logfile_pattern (str): The pattern of the file names of log files.
+
+        Returns:
+            True if the string of the log file pattern is multiple log files.
+
         """
         matchobj = re.search('[*? ]', logfile_pattern)
         if matchobj is not None:
@@ -707,7 +842,15 @@ class LogChecker(object):
 
     @staticmethod
     def to_unicode(string):
-        """Convert str to unicode"""
+        """Convert str to unicode.
+
+        Args:
+            string (str or bytes): The string or bytes to convert to unicode string.
+
+        Returns:
+            The unicode string to be converted.
+
+        """
         if sys.version_info >= (3,):
             if isinstance(string, bytes):
                 # convert bytes to str.
@@ -720,7 +863,15 @@ class LogChecker(object):
 
     @staticmethod
     def to_bytes(string):
-        """Convert str to bytes"""
+        """Convert str to bytes.
+
+        Args:
+            string (str): The string to convert to bytes.
+
+        Returns:
+            The bytes to be converted.
+
+        """
         if sys.version_info >= (3,):
             if isinstance(string, str):
                 # convert str to bytes.
@@ -739,10 +890,9 @@ def _debug(string):
 
 def _make_parser():
     parser = argparse.ArgumentParser(
-        description=("A log file regular expression-based parser plugin "
-                     "for Nagios."),
+        description="A log file regular expression-based parser plugin for Nagios.",
         usage=("%(prog)s [options] [-p <pattern>|-P <filename>] "
-               "-l <filename> -S <directory>"))
+               "-S <directory> -l <filename>"))
     parser.add_argument(
         "--version",
         action="version",
@@ -754,10 +904,10 @@ def _make_parser():
         dest="logfile_pattern",
         required=True,
         metavar="<filename>",
-        help=("The pattern of log files to be scanned. "
-              "The metacharacter * and ? are allowed. "
-              "If you want to set multiple patterns, "
-              "set a space between patterns.")
+        help=("The file names of log files to be scanned. "
+              "The metacharacters * and ? are available. "
+              "To set multiple files, set a space between file names. "
+              "See also --scantime.")
     )
     parser.add_argument(
         "-F", "--format",
@@ -765,28 +915,26 @@ def _make_parser():
         dest="logformat",
         metavar="<format>",
         default=LogChecker.FORMAT_SYSLOG,
-        help=("The regular expression of format of log to parse. "
-              "Required two group, format of '^(TIMESTAMP and TAG)(.*)$'. "
-              "Also, may use %%%%, %%Y, %%y, %%a, %%b, %%m, %%d, %%e, %%H, "
+        help=("Regular expression for log format. "
+              "It requires two groups in format of '^(TIMESTAMP and TAG)(.*)$'. "
+              "Also, it may use %%%%, %%Y, %%y, %%a, %%b, %%m, %%d, %%e, %%H, "
               "%%M, %%S, %%F and %%T of strftime(3). "
-              "(default: the regular expression for syslog.")
+              "(default: regular expression for syslog.")
     )
     parser.add_argument(
         "-s", "--seekfile",
         action="store",
         dest="seekfile",
         metavar="<filename>",
-        help=("Deprecated. Use -S option. "
-              "The file to store the seek position of the last scan. "
-              "If check multiple log files, ignore this option. ")
+        help=("Deprecated. Use -S option instead. "
+              "The file name of the file to store the seek position of the last scan. ")
     )
     parser.add_argument(
         "-S", "--state-directory", "--seekfile-directory",
         action="store",
         dest="state_directory",
         metavar="<directory>",
-        help=("The directory that store seek files, cache file and lock file. "
-              "If check multiple log files, require this option. "
+        help=("The directory to store seek files, cache file and lock file. "
               "'--seekfile-directory' is for backwards compatibility.")
     )
     parser.add_argument(
@@ -795,11 +943,9 @@ def _make_parser():
         dest="tag",
         default="",
         metavar="<tag>",
-        help=("Add a tag in the file names of state files, to prevent names "
-              "collisions. "
-              "Useful to avoid maintaining many '-S' temporary directories "
-              "when you check the same files several times with different "
-              "args. "
+        help=("Add a tag in the file names of state files, to prevent names collisions. "
+              "Useful to avoid maintaining many '-S' directories "
+              "when you check the same files several times with different args. "
               "'--seekfile-tag' is for backwards compatibility.")
     )
     parser.add_argument(
@@ -807,8 +953,8 @@ def _make_parser():
         action="store_true",
         dest="trace_inode",
         default=False,
-        help=("Trace the inode of log files. "
-              "If set, use inode information as a seek file.")
+        help=("If set, trace the inode of the log file. "
+              "After log rotatation, you can trace the log file.")
     )
     parser.add_argument(
         "-p", "--pattern",
@@ -822,7 +968,7 @@ def _make_parser():
         action="store",
         dest="patternfile",
         metavar="<filename>",
-        help="File containing regular expressions, one per line."
+        help="The file name of the file containing regular expressions, one per line. "
     )
     parser.add_argument(
         "--critical-pattern",
@@ -830,22 +976,22 @@ def _make_parser():
         dest="critical_pattern",
         metavar="<pattern>",
         help=("The regular expression to scan for in the log file. "
-              "In spite of --critical option, return CRITICAL.")
+              "If found, return CRITICAL.")
     )
     parser.add_argument(
         "--critical-patternfile",
         action="store",
         dest="critical_patternfile",
         metavar="<filename>",
-        help=("File containing regular expressions, one per line. "
-              "In spite of --critical option, return CRITICAL.")
+        help=("The file name of the file containing regular expressions, one per line. "
+              "If found, return CRITICAL.")
     )
     parser.add_argument(
         "-n", "--negpattern",
         action="store",
         dest="negpattern",
         metavar="<pattern>",
-        help=("The regular expression to skip except as critical pattern "
+        help=("The regular expression which all will be skipped except as critical pattern "
               "in the log file.")
     )
     parser.add_argument(
@@ -853,7 +999,7 @@ def _make_parser():
         action="store",
         dest="negpatternfile",
         metavar="<filename>",
-        help=("Specify a file with regular expressions "
+        help=("The file name of the file containing regular expressions "
               "which all will be skipped except as critical pattern, "
               "one per line. "
               "'-f' is for backwards compatibility.")
@@ -863,14 +1009,14 @@ def _make_parser():
         action="store",
         dest="critical_negpattern",
         metavar="<pattern>",
-        help="The regular expression to skip in the log file."
+        help="The regular expression which all will be skipped in the log file."
     )
     parser.add_argument(
         "--critical-negpatternfile",
         action="store",
         dest="critical_negpatternfile",
         metavar="<filename>",
-        help=("Specifiy a file with regular expressions "
+        help=("The file name of the file containing regular expressions "
               "which all will be skipped, one per line.")
     )
     parser.add_argument(
@@ -886,8 +1032,8 @@ def _make_parser():
         dest="encoding",
         default='utf-8',
         metavar="<encoding>",
-        help=("Specify the character encoding in the log file."
-              " (default: %(default)s)")
+        help=("Specify the character encoding in the log file. "
+              "(default: %(default)s)")
     )
     parser.add_argument(
         "-w", "--warning",
@@ -896,8 +1042,8 @@ def _make_parser():
         dest="warning",
         default=1,
         metavar="<number>",
-        help=("Return WARNING if at least this many matches found."
-              " (default: %(default)s)")
+        help=("Return WARNING if at least this many matches found. "
+              "(default: %(default)s)")
     )
     parser.add_argument(
         "-c", "--critical",
@@ -907,8 +1053,8 @@ def _make_parser():
         default=0,
         metavar="<number>",
         help=("Return CRITICAL if at least this many matches found. "
-              "i.e. don't return critical alerts unless specified explicitly."
-              " (default: %(default)s)")
+              "i.e. don't return critical alerts unless specified explicitly. "
+              "(default: %(default)s)")
     )
     parser.add_argument(
         "-t", "--scantime",
@@ -918,8 +1064,8 @@ def _make_parser():
         default=86400,
         metavar="<seconds>",
         help=("The range of time to scan. "
-              "The log files older than this time are not scanned."
-              " (default: %(default)s)")
+              "The log files older than this time are not scanned. "
+              "(default: %(default)s)")
     )
     parser.add_argument(
         "-E", "--expiration",
@@ -929,9 +1075,9 @@ def _make_parser():
         default=691200,
         metavar="<seconds>",
         help=("The expiration of seek files. "
-              "This value must be greater than period of log rotation "
-              "when use with -R option."
-              " (default: %(default)s)")
+              "This must be longer than the log rotation period. "
+              "The expired seek files are deleted with -R option. "
+              "(default: %(default)s)")
     )
     parser.add_argument(
         "-R", "--remove-seekfile",
@@ -945,7 +1091,7 @@ def _make_parser():
         action="store_true",
         dest="multiline",
         default=False,
-        help=("Consider multiple lines with same key as one log output. "
+        help=("Treat multiple lines outputed at once as one message. "
               "See also --format.")
     )
     parser.add_argument(
@@ -956,7 +1102,7 @@ def _make_parser():
         default=60,
         metavar="<seconds>",
         help=("The period to cache the result. "
-              "If you want to disable this cache feature, set '0'. "
+              "To disable this cache feature, set '0'. "
               "(default: %(default)s)")
     )
     parser.add_argument(
@@ -966,9 +1112,9 @@ def _make_parser():
         dest="lock_timeout",
         default=3,
         metavar="<seconds>",
-        help=("If another proccess is running, "
-              "wait for the period of this lock timeout. "
-              " (default: %(default)s)")
+        help=("The period to wait for if another process is running. "
+              "If timeout occurs, UNKNOWN is returned. "
+              "(default: %(default)s)")
     )
     return parser
 
@@ -1073,7 +1219,7 @@ def _generate_config(args):
 
 
 def main():
-    """Main function."""
+    """Run check_log_ng."""
     parser = _make_parser()
     args = _check_parser_args(parser)
     config = _generate_config(args)
