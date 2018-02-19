@@ -430,19 +430,7 @@ class LogChecker(object):
 
     def _create_seek_filename(
             self, logfile_pattern, logfile, trace_inode=False, tag=''):
-        """Return the file name of seek file.
-
-        Args:
-            logfile_pattern (str): The pattern of the file names of the log files.
-            state_directory (str): The state directory.
-            logfile (str): The file name of the log file.
-            trace_inode (bool): Whether it traces inode information.
-            tag (str): The tag.
-
-        Returns:
-            The file name of the seek file.
-
-        """
+        """Return the file name of seek file."""
         prefix = None
         filename = None
         if trace_inode:
