@@ -70,10 +70,6 @@ class LogCheckerTestCase(unittest.TestCase):
         self.tag1 = 'tag1'
         self.tag2 = 'tag2'
         self.seekfile = os.path.join(self.STATEDIR, 'testlog.seek')
-        self.seekfile1 = LogChecker.create_seek_filename(
-            self.logfile_pattern, self.STATEDIR, self.logfile1)
-        self.seekfile2 = LogChecker.create_seek_filename(
-            self.logfile_pattern, self.STATEDIR, self.logfile2)
 
         # lock file
         self.lockfile = os.path.join(self.STATEDIR, 'check_log_ng.lock')
@@ -523,6 +519,8 @@ class LogCheckerTestCase(unittest.TestCase):
         self._write_logfile(self.logfile1, line1)
 
         log.check(self.logfile_pattern, remove_seekfile=True)
+        self.seekfile1 = log._create_seek_filename(
+            self.logfile_pattern, self.logfile1)
         time.sleep(2)
 
         # Dec  5 12:34:54 hostname test: ERROR
@@ -532,6 +530,8 @@ class LogCheckerTestCase(unittest.TestCase):
         # seek file of logfile1 should not be purged.
         log.clear_state()
         log.check(self.logfile_pattern, remove_seekfile=True)
+        self.seekfile2 = log._create_seek_filename(
+            self.logfile_pattern, self.logfile2)
 
         self.assertEqual(log.get_state(), LogChecker.STATE_WARNING)
         self.assertEqual(

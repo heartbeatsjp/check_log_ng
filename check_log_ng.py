@@ -430,10 +430,31 @@ class LogChecker(object):
 
     def _create_seek_filename(
             self, logfile_pattern, logfile, trace_inode=False, tag=''):
-        """Return the file name of seek file."""
-        seekfile = LogChecker.create_seek_filename(
-            logfile_pattern, self.config['state_directory'], logfile,
-            trace_inode=trace_inode, tag=tag)
+        """Return the file name of seek file.
+
+        Args:
+            logfile_pattern (str): The pattern of the file names of the log files.
+            state_directory (str): The state directory.
+            logfile (str): The file name of the log file.
+            trace_inode (bool): Whether it traces inode information.
+            tag (str): The tag.
+
+        Returns:
+            The file name of the seek file.
+
+        """
+        prefix = None
+        filename = None
+        if trace_inode:
+            filename = (str(os.stat(logfile).st_ino) +
+                        tag + LogChecker._SUFFIX_SEEK_WITH_INODE)
+            prefix = LogChecker.get_digest(logfile_pattern)
+        else:
+            filename = (re.sub(r'[^-0-9A-Za-z]', '_', logfile) +
+                        tag + LogChecker._SUFFIX_SEEK)
+        if prefix:
+            filename = prefix + '.' + filename
+        seekfile = os.path.join(self.config['state_directory'], filename)
         return seekfile
 
     def _create_cache_filename(self, logfile_pattern, tag=''):
@@ -720,37 +741,6 @@ class LogChecker(object):
             key = list(item)[0]
             logformat = logformat.replace(key, item[key])
         return logformat
-
-    @staticmethod
-    def create_seek_filename(
-            logfile_pattern, state_directory, logfile,
-            trace_inode=False, tag=''):
-        """Make filename of seekfile from logfile and get the filename.
-
-        Args:
-            logfile_pattern (str): The pattern of the file names of the log files.
-            state_directory (str): The state directory.
-            logfile (str): The file name of the log file.
-            trace_inode (bool): Whether it traces inode information.
-            tag (str): The tag.
-
-        Returns:
-            The file name of the seek file.
-
-        """
-        prefix = None
-        filename = None
-        if trace_inode:
-            filename = (str(os.stat(logfile).st_ino) +
-                        tag + LogChecker._SUFFIX_SEEK_WITH_INODE)
-            prefix = LogChecker.get_digest(logfile_pattern)
-        else:
-            filename = (re.sub(r'[^-0-9A-Za-z]', '_', logfile) +
-                        tag + LogChecker._SUFFIX_SEEK)
-        if prefix:
-            filename = prefix + '.' + filename
-        seekfile = os.path.join(state_directory, filename)
-        return seekfile
 
     @staticmethod
     def _update_seekfile(seekfile, position):
