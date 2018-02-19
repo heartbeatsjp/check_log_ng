@@ -38,7 +38,7 @@ import warnings
 import argparse
 
 # Globals
-__version__ = '2.0.2'
+__version__ = '2.0.3'
 
 
 class LogChecker(object):
@@ -54,12 +54,12 @@ class LogChecker(object):
     FORMAT_SYSLOG = (
         r'^((?:%b\s%e\s%T|%FT%T\S*)\s[-_0-9A-Za-z.]+\s'
         r'(?:[^ :\[\]]+(?:\[\d+?\])?:\s)?)(.*)$')
-    SUFFIX_SEEK = ".seek"
-    SUFFIX_SEEK_WITH_INODE = ".inode.seek"
-    SUFFIX_CACHE = ".cache"
-    SUFFIX_LOCK = ".lock"
-    RETRY_PERIOD = 0.5
-    LOGFORMAT_EXPANSION_LIST = [
+    _SUFFIX_SEEK = ".seek"
+    _SUFFIX_SEEK_WITH_INODE = ".inode.seek"
+    _SUFFIX_CACHE = ".cache"
+    _SUFFIX_LOCK = ".lock"
+    _RETRY_PERIOD = 0.5
+    _LOGFORMAT_EXPANSION_LIST = [
         {'%%': '_PERCENT_'},
         {'%F': '%Y-%m-%d'},
         {'%T': '%H:%M:%S'},
@@ -132,7 +132,7 @@ class LogChecker(object):
             if key not in config:
                 continue
             value = config[key]
-            if isinstance(value, bool) or isinstance(value, int):
+            if isinstance(value, (bool, int)):
                 pass
             elif isinstance(value, list):
                 value = [LogChecker.to_unicode(x) for x in value]
@@ -146,7 +146,7 @@ class LogChecker(object):
         if self.config['case_insensitive']:
             self.pattern_flags = re.IGNORECASE
 
-        self.re_logformat = re.compile(LogChecker.expand_logformat_by_strftime(
+        self.re_logformat = re.compile(LogChecker._expand_logformat_by_strftime(
             self.config['logformat']))
 
         # status variables
@@ -220,7 +220,7 @@ class LogChecker(object):
                 continue
             seekfile_pattern = (
                 re.sub(r'[^-0-9A-Za-z*?]', '_', logfile_pattern) +
-                tag + LogChecker.SUFFIX_SEEK)
+                tag + LogChecker._SUFFIX_SEEK)
             for seekfile in glob.glob(seekfile_pattern):
                 if not os.path.isfile(seekfile):
                     continue
@@ -258,7 +258,7 @@ class LogChecker(object):
 
         curtime = time.time()
         seekfile_pattern = "{0}.[0-9]*{1}{2}".format(
-            prefix, tag, LogChecker.SUFFIX_SEEK_WITH_INODE)
+            prefix, tag, LogChecker._SUFFIX_SEEK_WITH_INODE)
         for seekfile in glob.glob(seekfile_pattern):
             if not os.path.isfile(seekfile):
                 continue
@@ -350,40 +350,39 @@ class LogChecker(object):
         message = None
         cur_message = None
 
-        fileobj = io.open(
-            logfile, mode='r', encoding=self.config['encoding'],
-            errors='replace')
-        fileobj.seek(start_position, 0)
+        with io.open(logfile, mode='r', encoding=self.config['encoding'],
+                     errors='replace') as fileobj:
+            fileobj.seek(start_position, 0)
 
-        for line in fileobj:
-            line = line.rstrip()
-            _debug("line='{0}'".format(line))
+            for line in fileobj:
+                line = line.rstrip()
+                _debug("line='{0}'".format(line))
 
-            matchobj = self.re_logformat.match(line)
-            # set cur_key and cur_message.
-            if matchobj is not None:
-                cur_key = matchobj.group(1)
-                cur_message = matchobj.group(2)
-            else:
-                cur_key = pre_key
-                cur_message = line
+                matchobj = self.re_logformat.match(line)
+                # set cur_key and cur_message.
+                if matchobj:
+                    cur_key = matchobj.group(1)
+                    cur_message = matchobj.group(2)
+                else:
+                    cur_key = pre_key
+                    cur_message = line
 
-            if pre_key is None:  # for first iteration
-                pre_key = cur_key
-                line_buffer.append(line)
-            elif pre_key == cur_key:
-                line_buffer.append(cur_message)
-            else:
-                message = ' '.join(line_buffer)
-                _debug("message='{0}'".format(message))
-                self._set_found(message, found, critical_found)
+                if pre_key is None:  # for first iteration
+                    pre_key = cur_key
+                    line_buffer.append(line)
+                elif pre_key == cur_key:
+                    line_buffer.append(cur_message)
+                else:
+                    message = ' '.join(line_buffer)
+                    _debug("message='{0}'".format(message))
+                    self._set_found(message, found, critical_found)
 
-                # initialize variables for next loop
-                pre_key = cur_key
-                line_buffer = []
-                line_buffer.append(line)
-        end_position = fileobj.tell()
-        fileobj.close()
+                    # initialize variables for next loop
+                    pre_key = cur_key
+                    line_buffer = []
+                    line_buffer.append(line)
+            end_position = fileobj.tell()
+            fileobj.close()
 
         # flush line buffer
         if line_buffer:
@@ -395,17 +394,16 @@ class LogChecker(object):
     def _check_each_single_line(
             self, logfile, start_position, found, critical_found):
         """Match the pattern each a single line in the log file."""
-        fileobj = io.open(
-            logfile, mode='r', encoding=self.config['encoding'],
-            errors='replace')
-        fileobj.seek(start_position, 0)
+        with io.open(logfile, mode='r', encoding=self.config['encoding'],
+                     errors='replace') as fileobj:
+            fileobj.seek(start_position, 0)
 
-        for line in fileobj:
-            message = line.rstrip()
-            _debug("message='{0}'".format(message))
-            self._set_found(message, found, critical_found)
-        end_position = fileobj.tell()
-        fileobj.close()
+            for line in fileobj:
+                message = line.rstrip()
+                _debug("message='{0}'".format(message))
+                self._set_found(message, found, critical_found)
+            end_position = fileobj.tell()
+            fileobj.close()
         return end_position
 
     def _create_digest_condition(self, logfile_pattern):
@@ -430,6 +428,23 @@ class LogChecker(object):
         digest_condition = LogChecker.get_digest('\n'.join(strings))
         return digest_condition
 
+    def _create_seek_filename(
+            self, logfile_pattern, logfile, trace_inode=False, tag=''):
+        """Return the file name of seek file."""
+        prefix = None
+        filename = None
+        if trace_inode:
+            filename = (str(os.stat(logfile).st_ino) +
+                        tag + LogChecker._SUFFIX_SEEK_WITH_INODE)
+            prefix = LogChecker.get_digest(logfile_pattern)
+        else:
+            filename = (re.sub(r'[^-0-9A-Za-z]', '_', logfile) +
+                        tag + LogChecker._SUFFIX_SEEK)
+        if prefix:
+            filename = prefix + '.' + filename
+        seekfile = os.path.join(self.config['state_directory'], filename)
+        return seekfile
+
     def _create_cache_filename(self, logfile_pattern, tag=''):
         """Return the file name of cache file."""
         digest_condition = self._create_digest_condition(logfile_pattern)
@@ -438,7 +453,7 @@ class LogChecker(object):
         if tag:
             filename_elements.append(".")
             filename_elements.append(tag)
-        filename_elements.append(LogChecker.SUFFIX_CACHE)
+        filename_elements.append(LogChecker._SUFFIX_CACHE)
         cache_filename = os.path.join(
             self.config['state_directory'], "".join(filename_elements))
         return cache_filename
@@ -451,7 +466,7 @@ class LogChecker(object):
         if tag:
             filename_elements.append(".")
             filename_elements.append(tag)
-        filename_elements.append(LogChecker.SUFFIX_LOCK)
+        filename_elements.append(LogChecker._SUFFIX_LOCK)
         lock_filename = os.path.join(
             self.config['state_directory'], "".join(filename_elements))
         return lock_filename
@@ -493,7 +508,7 @@ class LogChecker(object):
                 locked = True
                 break
             cur_time = time.time()
-            time.sleep(LogChecker.RETRY_PERIOD)
+            time.sleep(LogChecker._RETRY_PERIOD)
         if not locked:
             self.state = LogChecker.STATE_UNKNOWN
             self.message = "UNKNOWN: Lock timeout. Another process is running."
@@ -505,9 +520,8 @@ class LogChecker(object):
         else:
             # create seekfile
             if not seekfile:
-                seekfile = LogChecker.get_seekfile(
-                    logfile_pattern, self.config['state_directory'],
-                    logfile_pattern,
+                seekfile = self._create_seek_filename(
+                    logfile_pattern, logfile_pattern,
                     trace_inode=self.config['trace_inode'], tag=tag)
             self._check_log(logfile_pattern, seekfile)
 
@@ -541,7 +555,7 @@ class LogChecker(object):
 
         filesize = os.path.getsize(logfile)
         # define seek positions.
-        start_position = LogChecker.read_seekfile(seekfile)
+        start_position = LogChecker._read_seekfile(seekfile)
         end_position = 0
         if not self._check_updated(logfile, start_position, filesize):
             return
@@ -568,7 +582,7 @@ class LogChecker(object):
             self.critical_found_messages.append(
                 "{0} at {1}".format(','.join(critical_found), logfile))
 
-        LogChecker.update_seekfile(seekfile, end_position)
+        LogChecker._update_seekfile(seekfile, end_position)
         return
 
     def check_log_multi(
@@ -596,8 +610,8 @@ class LogChecker(object):
         for logfile in logfile_list:
             if not os.path.isfile(logfile):
                 continue
-            seekfile = LogChecker.get_seekfile(
-                logfile_pattern, self.config['state_directory'], logfile,
+            seekfile = self._create_seek_filename(
+                logfile_pattern, logfile,
                 trace_inode=self.config['trace_inode'], tag=tag)
             self._check_log(logfile, seekfile)
 
@@ -648,9 +662,9 @@ class LogChecker(object):
         if os.stat(cachefile).st_mtime < time.time() - self.config['cachetime']:
             _debug("Cache is expired: mtime < curtime - cachetime")
             return LogChecker.STATE_NO_CACHE, None
-        fileobj = io.open(cachefile, mode='r', encoding='utf-8')
-        line = fileobj.readline()
-        fileobj.close()
+        with io.open(cachefile, mode='r', encoding='utf-8') as fileobj:
+            line = fileobj.readline()
+            fileobj.close()
         state, message = line.split("\t", 1)
         _debug("cache: state={0}, message='{1}'".format(state, message))
         return int(state), message
@@ -658,12 +672,12 @@ class LogChecker(object):
     def _update_cache(self, cachefile):
         """Update the cache."""
         tmp_cachefile = cachefile + "." + str(os.getpid())
-        cachefileobj = io.open(tmp_cachefile, mode='w', encoding='utf-8')
-        cachefileobj.write(LogChecker.to_unicode(str(self.get_state())))
-        cachefileobj.write("\t")
-        cachefileobj.write(self.get_message())
-        cachefileobj.flush()
-        cachefileobj.close()
+        with io.open(tmp_cachefile, mode='w', encoding='utf-8') as cachefileobj:
+            cachefileobj.write(LogChecker.to_unicode(str(self.get_state())))
+            cachefileobj.write("\t")
+            cachefileobj.write(self.get_message())
+            cachefileobj.flush()
+            cachefileobj.close()
         os.rename(tmp_cachefile, cachefile)
         return True
 
@@ -690,18 +704,18 @@ class LogChecker(object):
         if pattern_filename:
             if os.path.isfile(pattern_filename):
                 lines = []
-                fileobj = io.open(pattern_filename, mode='r', encoding='utf-8')
-                for line in fileobj:
-                    pattern = line.rstrip()
-                    if pattern:
-                        lines.append(pattern)
-                fileobj.close()
+                with io.open(pattern_filename, mode='r', encoding='utf-8') as fileobj:
+                    for line in fileobj:
+                        pattern = line.rstrip()
+                        if pattern:
+                            lines.append(pattern)
+                    fileobj.close()
                 if lines:
                     pattern_list.extend(lines)
         return pattern_list
 
     @staticmethod
-    def expand_logformat_by_strftime(logformat):
+    def _expand_logformat_by_strftime(logformat):
         """Expand log format by strftime variables.
 
         Args:
@@ -711,61 +725,30 @@ class LogChecker(object):
             The string expanded by strftime().
 
         """
-        for item in LogChecker.LOGFORMAT_EXPANSION_LIST:
+        for item in LogChecker._LOGFORMAT_EXPANSION_LIST:
             key = list(item)[0]
             logformat = logformat.replace(key, item[key])
         return logformat
 
     @staticmethod
-    def get_seekfile(
-            logfile_pattern, state_directory, logfile,
-            trace_inode=False, tag=''):
-        """Make filename of seekfile from logfile and get the filename.
-
-        Args:
-            logfile_pattern (str): The pattern of the file names of the log files.
-            state_directory (str): The state directory.
-            logfile (str): The file name of the log file.
-            trace_inode (bool): Whether it traces inode information.
-            tag (str): The tag.
-
-        Returns:
-            The file name of the seek file.
-
-        """
-        prefix = None
-        filename = None
-        if trace_inode:
-            filename = (str(os.stat(logfile).st_ino) +
-                        tag + LogChecker.SUFFIX_SEEK_WITH_INODE)
-            prefix = LogChecker.get_digest(logfile_pattern)
-        else:
-            filename = (re.sub(r'[^-0-9A-Za-z]', '_', logfile) +
-                        tag + LogChecker.SUFFIX_SEEK)
-        if prefix:
-            filename = prefix + '.' + filename
-        seekfile = os.path.join(state_directory, filename)
-        return seekfile
-
-    @staticmethod
-    def update_seekfile(seekfile, position):
+    def _update_seekfile(seekfile, position):
         """Update the seek file for the log file."""
         tmp_seekfile = seekfile + "." + str(os.getpid())
-        fileobj = io.open(tmp_seekfile, mode='w', encoding='utf-8')
-        fileobj.write(LogChecker.to_unicode(str(position)))
-        fileobj.flush()
-        fileobj.close()
+        with io.open(tmp_seekfile, mode='w', encoding='utf-8') as fileobj:
+            fileobj.write(LogChecker.to_unicode(str(position)))
+            fileobj.flush()
+            fileobj.close()
         os.rename(tmp_seekfile, seekfile)
         return True
 
     @staticmethod
-    def read_seekfile(seekfile):
+    def _read_seekfile(seekfile):
         """Read the offset of the log file from its seek file."""
         if not os.path.exists(seekfile):
             return 0
-        fileobj = io.open(seekfile, mode='r', encoding='utf-8')
-        offset = int(fileobj.readline())
-        fileobj.close()
+        with io.open(seekfile, mode='r', encoding='utf-8') as fileobj:
+            offset = int(fileobj.readline())
+            fileobj.close()
         return offset
 
     @staticmethod
@@ -836,7 +819,7 @@ class LogChecker(object):
 
         """
         matchobj = re.search('[*? ]', logfile_pattern)
-        if matchobj is not None:
+        if matchobj:
             return True
         return False
 
