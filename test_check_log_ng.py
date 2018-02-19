@@ -70,9 +70,9 @@ class LogCheckerTestCase(unittest.TestCase):
         self.tag1 = 'tag1'
         self.tag2 = 'tag2'
         self.seekfile = os.path.join(self.STATEDIR, 'testlog.seek')
-        self.seekfile1 = LogChecker.get_seekfile(
+        self.seekfile1 = LogChecker.create_seek_filename(
             self.logfile_pattern, self.STATEDIR, self.logfile1)
-        self.seekfile2 = LogChecker.get_seekfile(
+        self.seekfile2 = LogChecker.create_seek_filename(
             self.logfile_pattern, self.STATEDIR, self.logfile2)
 
         # lock file
@@ -107,21 +107,21 @@ class LogCheckerTestCase(unittest.TestCase):
 
         # remove seek files.
         seekfiles = glob.glob(
-            os.path.join(self.STATEDIR, '*' + LogChecker.SUFFIX_SEEK))
+            os.path.join(self.STATEDIR, '*' + LogChecker._SUFFIX_SEEK))
         for seekfile in seekfiles:
             if os.path.exists(seekfile):
                 os.unlink(seekfile)
 
         # remove a cache file.
         cachefiles = glob.glob(
-            os.path.join(self.STATEDIR, '*' + LogChecker.SUFFIX_CACHE))
+            os.path.join(self.STATEDIR, '*' + LogChecker._SUFFIX_CACHE))
         for cachefile in cachefiles:
             if os.path.exists(cachefile):
                 os.unlink(cachefile)
 
         # remove a lock file.
         lockfiles = glob.glob(
-            os.path.join(self.STATEDIR, '*' + LogChecker.SUFFIX_LOCK))
+            os.path.join(self.STATEDIR, '*' + LogChecker._SUFFIX_LOCK))
         for lockfile in lockfiles:
             if os.path.exists(lockfile):
                 os.unlink(lockfile)
@@ -428,9 +428,8 @@ class LogCheckerTestCase(unittest.TestCase):
 
         # create seekfile of logfile
         log.check(self.logfile_pattern)
-        seekfile_1 = LogChecker.get_seekfile(
-            self.logfile_pattern, self.STATEDIR, self.logfile,
-            trace_inode=True)
+        seekfile_1 = log._create_seek_filename(
+            self.logfile_pattern, self.logfile, trace_inode=True)
 
         # update logfile
         # Dec  5 12:34:51 hostname test: ERROR
@@ -448,12 +447,10 @@ class LogCheckerTestCase(unittest.TestCase):
         # create seekfile of logfile
         log.clear_state()
         log.check(self.logfile_pattern)
-        seekfile_2 = LogChecker.get_seekfile(
-            self.logfile_pattern, self.STATEDIR, self.logfile,
-            trace_inode=True)
-        seekfile1_2 = LogChecker.get_seekfile(
-            self.logfile_pattern, self.STATEDIR, self.logfile1,
-            trace_inode=True)
+        seekfile_2 = log._create_seek_filename(
+            self.logfile_pattern, self.logfile, trace_inode=True)
+        seekfile1_2 = log._create_seek_filename(
+            self.logfile_pattern, self.logfile1, trace_inode=True)
 
         self.assertEqual(log.get_state(), LogChecker.STATE_WARNING)
         self.assertEqual(
@@ -591,12 +588,10 @@ class LogCheckerTestCase(unittest.TestCase):
         # do check_log_multi, and create seekfile and seekfile1
         log.clear_state()
         log.check(self.logfile_pattern, remove_seekfile=True)
-        seekfile_1 = LogChecker.get_seekfile(
-            self.logfile_pattern, self.STATEDIR, self.logfile,
-            trace_inode=True)
-        seekfile1_1 = LogChecker.get_seekfile(
-            self.logfile_pattern, self.STATEDIR, self.logfile1,
-            trace_inode=True)
+        seekfile_1 = log._create_seek_filename(
+            self.logfile_pattern, self.logfile, trace_inode=True)
+        seekfile1_1 = log._create_seek_filename(
+            self.logfile_pattern, self.logfile1, trace_inode=True)
         time.sleep(4)
 
         # update logfile
@@ -612,9 +607,8 @@ class LogCheckerTestCase(unittest.TestCase):
         log.clear_state()
         log.check(
             self.logfile_pattern, remove_seekfile=True)
-        seekfile1_2 = LogChecker.get_seekfile(
-            self.logfile_pattern, self.STATEDIR, self.logfile1,
-            trace_inode=True)
+        seekfile1_2 = log._create_seek_filename(
+            self.logfile_pattern, self.logfile1, trace_inode=True)
 
         self.assertEqual(log.get_state(), LogChecker.STATE_WARNING)
         self.assertEqual(
@@ -703,15 +697,12 @@ class LogCheckerTestCase(unittest.TestCase):
         self._write_logfile(self.logfile2, line3)
 
         # create seekfile of logfile
-        seekfile_1 = LogChecker.get_seekfile(
-            self.logfile_pattern, self.STATEDIR, self.logfile,
-            tag=self.tag1)
-        seekfile_2 = LogChecker.get_seekfile(
-            self.logfile_pattern, self.STATEDIR, self.logfile,
-            tag=self.tag1)
-        seekfile_3 = LogChecker.get_seekfile(
-            self.logfile_pattern, self.STATEDIR, self.logfile,
-            tag=self.tag2)
+        seekfile_1 = log._create_seek_filename(
+            self.logfile_pattern, self.logfile, tag=self.tag1)
+        seekfile_2 = log._create_seek_filename(
+            self.logfile_pattern, self.logfile, tag=self.tag1)
+        seekfile_3 = log._create_seek_filename(
+            self.logfile_pattern, self.logfile, tag=self.tag2)
         log.check(self.logfile, seekfile=seekfile_3)
         log.clear_state()
         log.check(
