@@ -712,7 +712,14 @@ class LogChecker(object):
         """
         pattern_list = []
         if pattern_string:
-            pattern_list.append(pattern_string)
+            # Revert the surrogate-escaped string in the ASCII locale.
+            pattern_string = re.sub(
+                r'[\udc80-\udcff]+',
+                lambda m: b''.join(
+                    [bytes.fromhex('%x' % (ord(char) - ord('\udc00'))) for char in m.group(0)]
+                ).decode('utf-8'),
+                pattern_string)
+            pattern_list.append(LogChecker.to_unicode(pattern_string))
         if pattern_filename:
             if os.path.isfile(pattern_filename):
                 lines = []
@@ -847,13 +854,21 @@ class LogChecker(object):
 
         """
         if sys.version_info >= (3,):
+            # Python3
+            # type: str or bytes
             if isinstance(string, bytes):
+                # type: bytes
                 # convert bytes to str.
                 return string.decode('utf-8')
+            # type: str
         else:
+            # Python2
+            # type: unicode or str
             if isinstance(string, str):
+                # type: str
                 # convert str to unicode.
                 return string.decode('utf-8')
+            # type: unicode
         return string
 
     @staticmethod
@@ -861,26 +876,39 @@ class LogChecker(object):
         """Convert str to bytes.
 
         Args:
-            string (str): The string to convert to bytes.
+            string (str or unicode): The string to convert to bytes.
 
         Returns:
             The bytes to be converted.
 
         """
         if sys.version_info >= (3,):
+            # Python3
+            # type: str or bytes
             if isinstance(string, str):
-                # convert str to bytes.
+                # type: str
                 return string.encode('utf-8')
+            # type: bytes
         else:
+            # Python2
+            # type: unicode or str
             if not isinstance(string, str):
-                # convert unicode to str.
+                # type: unicode
                 return string.encode('utf-8')
+            # type: str
         return string
 
 
 def _debug(string):
     if not __debug__:
         print("DEBUG: {0}".format(string))
+
+
+def _print_message(string):
+    with io.open(sys.stdout.fileno(), mode='w', encoding='utf-8') as fileobj:
+        fileobj.write(string)
+        fileobj.write('\n')
+        fileobj.close()
 
 
 def _make_parser():
@@ -1223,7 +1251,8 @@ def main():
         args.logfile_pattern, seekfile=args.seekfile,
         remove_seekfile=args.remove_seekfile, tag=args.tag)
     state = log.get_state()
-    print(log.get_message())
+    message = log.get_message()
+    _print_message(message)
     sys.exit(state)
 
 
