@@ -222,7 +222,7 @@ class LogChecker(object):
         try:
             os.chdir(self.config['state_directory'])
         except OSError:
-            print("Unable to chdir: {0}".format(
+            LogChecker.print_message("Unable to chdir: {0}".format(
                 self.config['state_directory']))
             sys.exit(LogChecker.STATE_UNKNOWN)
 
@@ -242,14 +242,14 @@ class LogChecker(object):
                     _debug("remove seekfile: {0}".format(seekfile))
                     os.unlink(seekfile)
                 except OSError:
-                    print("Unable to remove old seekfile: {0}".format(
+                    LogChecker.print_message("Unable to remove old seekfile: {0}".format(
                         seekfile))
                     sys.exit(LogChecker.STATE_UNKNOWN)
 
         try:
             os.chdir(cwd)
         except OSError:
-            print("Unable to chdir: {0}".format(cwd))
+            LogChecker.print_message("Unable to chdir: {0}".format(cwd))
             sys.exit(LogChecker.STATE_UNKNOWN)
 
         return True
@@ -264,7 +264,7 @@ class LogChecker(object):
         try:
             os.chdir(self.config['state_directory'])
         except OSError:
-            print("Unable to chdir: {0}".format(
+            LogChecker.print_message("Unable to chdir: {0}".format(
                 self.config['state_directory']))
             sys.exit(LogChecker.STATE_UNKNOWN)
 
@@ -280,13 +280,13 @@ class LogChecker(object):
                 _debug("remove seekfile: {0}".format(seekfile))
                 os.unlink(seekfile)
             except OSError:
-                print("Unable to remove old seekfile: {0}".format(seekfile))
+                LogChecker.print_message("Unable to remove old seekfile: {0}".format(seekfile))
                 sys.exit(LogChecker.STATE_UNKNOWN)
 
         try:
             os.chdir(cwd)
         except OSError:
-            print("Unable to chdir: {0}".format(cwd))
+            LogChecker.print_message("Unable to chdir: {0}".format(cwd))
             sys.exit(LogChecker.STATE_UNKNOWN)
 
         return True
@@ -713,24 +713,35 @@ class LogChecker(object):
         pattern_list = []
         if pattern_string:
             # Revert the surrogate-escaped string in the ASCII locale.
-            pattern_string = re.sub(
-                r'[\udc80-\udcff]+',
-                lambda m: b''.join(
-                    [bytes.fromhex('%x' % (ord(char) - ord('\udc00'))) for char in m.group(0)]
-                ).decode('utf-8'),
-                pattern_string)
-            pattern_list.append(LogChecker.to_unicode(pattern_string))
+            try:
+                pattern_string = re.sub(
+                    r'[\udc80-\udcff]+',
+                    lambda m: b''.join(
+                        [bytes.fromhex('%x' % (ord(char) - ord('\udc00'))) for char in m.group(0)]
+                    ).decode('utf-8'),
+                    pattern_string)
+                pattern_list.append(LogChecker.to_unicode(pattern_string))
+            except UnicodeDecodeError:
+                LogChecker.print_message("The character encoding of the locale or pattern string is incorrect. Use UTF-8.")
+                sys.exit(LogChecker.STATE_UNKNOWN)
         if pattern_filename:
             if os.path.isfile(pattern_filename):
                 lines = []
-                with io.open(pattern_filename, mode='r', encoding='utf-8') as fileobj:
-                    for line in fileobj:
-                        pattern = line.rstrip()
-                        if pattern:
-                            lines.append(pattern)
-                    fileobj.close()
+                try:
+                    with io.open(pattern_filename, mode='r', encoding='utf-8') as fileobj:
+                        for line in fileobj:
+                            pattern = line.rstrip()
+                            if pattern:
+                                lines.append(pattern)
+                        fileobj.close()
+                except UnicodeDecodeError:
+                    LogChecker.print_message("The character encoding of the pattern file is incorrect: {0}. Save its character encoding as UTF-8.".format(pattern_filename))
+                    sys.exit(LogChecker.STATE_UNKNOWN)
                 if lines:
                     pattern_list.extend(lines)
+            else:
+                LogChecker.print_message("Unable to find the pattern file: {0}".format(pattern_filename))
+                sys.exit(LogChecker.STATE_UNKNOWN)
         return pattern_list
 
     @staticmethod
@@ -898,17 +909,17 @@ class LogChecker(object):
             # type: str
         return string
 
+    @staticmethod
+    def print_message(string):
+        with io.open(sys.stdout.fileno(), mode='w', encoding='utf-8') as fileobj:
+            fileobj.write(string)
+            fileobj.write('\n')
+            fileobj.close()
+
 
 def _debug(string):
     if not __debug__:
         print("DEBUG: {0}".format(string))
-
-
-def _print_message(string):
-    with io.open(sys.stdout.fileno(), mode='w', encoding='utf-8') as fileobj:
-        fileobj.write(string)
-        fileobj.write('\n')
-        fileobj.close()
 
 
 def _make_parser():
@@ -1252,7 +1263,7 @@ def main():
         remove_seekfile=args.remove_seekfile, tag=args.tag)
     state = log.get_state()
     message = log.get_message()
-    _print_message(message)
+    LogChecker.print_message(message)
     sys.exit(state)
 
 
