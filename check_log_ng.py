@@ -35,7 +35,19 @@ import hashlib
 import base64
 import fcntl
 import warnings
-import argparse
+
+FALLBACK_PATH = "/usr/local/hb-agent/bin"
+
+try:
+    import argparse
+except ImportError as _ex:
+    if __name__ != "__main__":
+        raise _ex
+    if FALLBACK_PATH not in os.environ["PATH"]:
+        os.environ["PATH"] = ":".join([FALLBACK_PATH, os.environ["PATH"]])
+        os.execve(__file__, sys.argv, os.environ)
+    else:
+        raise _ex
 
 # Globals
 __version__ = '2.0.3'

@@ -176,6 +176,10 @@ If you use RHEL6/CentOS6, you can run:
 $ sudo yum install python-argparse
 ~~~
 
+Note:  By default, `FALLBACK_PATH` is set HEARTBEATS (it's us!) specific value.
+When you want to use `check_log_ng` with Python2.6 and use `FALLBACK_PATH`,
+change this to adjust to your environment.
+
 ## Usage
 
 ### Help
