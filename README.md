@@ -272,6 +272,7 @@ optional arguments:
   --lock-timeout <seconds>
                         The period to wait for if another process is running.
                         If timeout occurs, UNKNOWN is returned. (default: 3)
+  -q, --quiet           Suppress output of matched lines.
 ```
 
 ## Contributing

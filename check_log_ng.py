@@ -115,6 +115,7 @@ class LogChecker(object):
             expiration (int): The expiration of seek files.
             cachetime (int): The period to cache the result.
             lock_timeout (int): The period to wait for if another process is running.
+            quiet (bool): Suppress output of matched lines.
 
         Args:
             config (dict): The dictionary of configuration parameters.
@@ -138,6 +139,7 @@ class LogChecker(object):
         self.config['expiration'] = 691200
         self.config['cachetime'] = 60
         self.config['lock_timeout'] = 3
+        self.config['quiet'] = False
 
         # overwrite values with user's values
         for key in self.config:
@@ -587,12 +589,20 @@ class LogChecker(object):
 
         if found:
             self.found.extend(found)
-            self.found_messages.append(
-                "{0} at {1}".format(','.join(found), logfile))
+            if self.config['quiet']:
+                self.found_messages.append(
+                    "at {0}".format(logfile))
+            else:
+                self.found_messages.append(
+                    "{0} at {1}".format(','.join(found), logfile))
         if critical_found:
             self.critical_found.extend(critical_found)
-            self.critical_found_messages.append(
-                "{0} at {1}".format(','.join(critical_found), logfile))
+            if self.config['quiet']:
+                self.critical_found_messages.append(
+                    "at {0}".format(logfile))
+            else:
+                self.critical_found_messages.append(
+                    "{0} at {1}".format(','.join(critical_found), logfile))
 
         LogChecker._update_seekfile(seekfile, end_position)
         return
@@ -1150,6 +1160,13 @@ def _make_parser():
               "If timeout occurs, UNKNOWN is returned. "
               "(default: %(default)s)")
     )
+    parser.add_argument(
+        "-q", "--quiet",
+        action="store_true",
+        dest="quiet",
+        default=False,
+        help=("Suppress output of matched lines.")
+    )
     return parser
 
 
@@ -1247,7 +1264,8 @@ def _generate_config(args):
         "scantime": args.scantime,
         "expiration": args.expiration,
         "cachetime": args.cachetime,
-        "lock_timeout": args.lock_timeout
+        "lock_timeout": args.lock_timeout,
+        "quiet": args.quiet
     }
     return config
 
