@@ -315,22 +315,32 @@ class LogChecker(object):
 
     def _update_state(self):
         """Update the state of the result."""
-        output_mode = ""
+        output_mode = None
         if self.config['output_quiet']:
-            output_mode = "QUIET: "
+            output_mode = "QUIET"
         elif self.config['output_header']:
-            output_mode = "HEADER: "
+            output_mode = "HEADER"
         num_critical = len(self.critical_found)
         if num_critical > 0:
             self.state = LogChecker.STATE_CRITICAL
-            self.messages.append("Critical Found {0} lines: {1}{2}".format(
-                num_critical, output_mode, ','.join(self.critical_found_messages)))
+            if output_mode:
+                self.messages.append("Critical Found {0} lines ({1}): {2}".format(
+                    num_critical, output_mode, ','.join(self.critical_found_messages)))
+            else:
+                self.messages.append("Critical Found {0} lines: {1}".format(
+                    num_critical, ','.join(self.critical_found_messages)))
         num = len(self.found)
         if num > 0:
-            self.messages.append(
-                "Found {0} lines (limit={1}/{2}): {3}{4}".format(
-                    num, self.config['warning'], self.config['critical'],
-                    output_mode, ','.join(self.found_messages)))
+            if output_mode:
+                self.messages.append(
+                    "Found {0} lines (limit={1}/{2}, {3}): {4}".format(
+                        num, self.config['warning'], self.config['critical'],
+                        output_mode, ','.join(self.found_messages)))
+            else:
+                self.messages.append(
+                    "Found {0} lines (limit={1}/{2}): {3}".format(
+                        num, self.config['warning'], self.config['critical'],
+                        ','.join(self.found_messages)))
             if self.config['critical'] > 0 and self.config['critical'] <= num:
                 if self.state is None:
                     self.state = LogChecker.STATE_CRITICAL

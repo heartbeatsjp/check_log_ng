@@ -24,16 +24,16 @@ class LogCheckerTestCase(unittest.TestCase):
     # Class constant
     MESSAGE_OK = "OK - No matches found."
     MESSAGE_WARNING_ONE = "WARNING: Found 1 lines (limit=1/0): {0} at {1}"
-    MESSAGE_WARNING_ONE_WITH_QUIET = "WARNING: Found 1 lines (limit=1/0): QUIET: at {0}"
-    MESSAGE_WARNING_ONE_WITH_HEADER = "WARNING: Found 1 lines (limit=1/0): HEADER: {0} at {1}"
+    MESSAGE_WARNING_ONE_WITH_QUIET = "WARNING: Found 1 lines (limit=1/0, QUIET): at {0}"
+    MESSAGE_WARNING_ONE_WITH_HEADER = "WARNING: Found 1 lines (limit=1/0, HEADER): {0} at {1}"
     MESSAGE_WARNING_TWO = "WARNING: Found 2 lines (limit=1/0): {0},{1} at {2}"
-    MESSAGE_WARNING_TWO_WITH_QUIET = "WARNING: Found 2 lines (limit=1/0): QUIET: at {0}"
-    MESSAGE_WARNING_TWO_WITH_HEADER = "WARNING: Found 2 lines (limit=1/0): HEADER: {0},{1} at {2}"
+    MESSAGE_WARNING_TWO_WITH_QUIET = "WARNING: Found 2 lines (limit=1/0, QUIET): at {0}"
+    MESSAGE_WARNING_TWO_WITH_HEADER = "WARNING: Found 2 lines (limit=1/0, HEADER): {0},{1} at {2}"
     MESSAGE_WARNING_TWO_IN_TWO_FILES = (
         "WARNING: Found 2 lines (limit=1/0): {0} at {1},{2} at {3}")
     MESSAGE_CRITICAL_ONE = "CRITICAL: Critical Found 1 lines: {0} at {1}"
-    MESSAGE_CRITICAL_ONE_WITH_QUIET = "CRITICAL: Critical Found 1 lines: QUIET: at {0}"
-    MESSAGE_CRITICAL_ONE_WITH_HEADER = "CRITICAL: Critical Found 1 lines: HEADER: {0} at {1}"
+    MESSAGE_CRITICAL_ONE_WITH_QUIET = "CRITICAL: Critical Found 1 lines (QUIET): at {0}"
+    MESSAGE_CRITICAL_ONE_WITH_HEADER = "CRITICAL: Critical Found 1 lines (HEADER): {0} at {1}"
     MESSAGE_UNKNOWN_LOCK_TIMEOUT = (
         "UNKNOWN: Lock timeout. Another process is running.")
 

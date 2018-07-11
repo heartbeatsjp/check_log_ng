@@ -141,7 +141,7 @@ Outout:
 WARNING: Found 1 lines (limit=1/0): Jul 11 06:44:22 hostname app: ERROR Unable to access to 192.0.2.1 at /var/log/messages
 ~~~
 
-#### Example to use `-H`
+#### Example to use `-H/--output-header`
 
 ~~~sh
 check_log_ng.py -p 'ERROR' -H -S /var/spool/check_log_ng -l '/var/log/messages'
@@ -150,10 +150,10 @@ check_log_ng.py -p 'ERROR' -H -S /var/spool/check_log_ng -l '/var/log/messages'
 Outout:
 
 ~~~
-WARNING: Found 1 lines (limit=1/0): HEADER: Jul 11 06:44:22 hostname app:  at /var/log/messages
+WARNING: Found 1 lines (limit=1/0, HEADER): Jul 11 06:44:22 hostname app:  at /var/log/messages
 ~~~
 
-#### Example to use `-q`
+#### Example to use `-q/--quiet`
 
 ~~~sh
 check_log_ng.py -p 'ERROR' -Q -S /var/spool/check_log_ng -l '/var/log/messages'
@@ -162,7 +162,7 @@ check_log_ng.py -p 'ERROR' -Q -S /var/spool/check_log_ng -l '/var/log/messages'
 Outout:
 
 ~~~
-WARNING: Found 1 lines (limit=1/0): QUIET: at /var/log/messages
+WARNING: Found 1 lines (limit=1/0, QUIET): at /var/log/messages
 ~~~
 
 ### Dry run
