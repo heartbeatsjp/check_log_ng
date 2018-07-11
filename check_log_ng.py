@@ -13,7 +13,7 @@ Features are as follows:
 - This script uses seek files which record the position where the check is
   completed for each log file.
   With these seek files, you can check only the differences from the last check.
-- You can check multiple lines outputed at once as one message.
+- You can check multiple lines outputted at once as one message.
 - The result can be cached within the specified time period.
   This will help multiple monitoring servers and multiple attempts.
 
@@ -64,8 +64,12 @@ class LogChecker(object):
     STATE_DEPENDENT = 4
     STATE_NO_CACHE = -1
     FORMAT_SYSLOG = (
-        r'^((?:%b\s%e\s%T|%FT%T\S*)\s[-_0-9A-Za-z.]+\s'
-        r'(?:[^ :\[\]]+(?:\[\d+?\])?:\s)?)(.*)$')
+        r'^((?:%b\s%e\s%T|%FT%T\S*)\s'
+        r'[-_0-9A-Za-z.]+\s'
+        r'(?:[^ :\[\]]+(?:\[\d+?\])?:\s)?)'
+        r'(.*)$')
+    '''FORMAT_SYSLOG is `^(TIMESTAMP HOSTNAME (TAG )?)(MSG)$`.'''
+
     _SUFFIX_SEEK = ".seek"
     _SUFFIX_SEEK_WITH_INODE = ".inode.seek"
     _SUFFIX_CACHE = ".cache"
@@ -110,11 +114,12 @@ class LogChecker(object):
             warning (int): The number of times found that be needed to return WARNING.
             critical (int): The number of times found that be needed to return CRITICAL.
             trace_inode (bool): Trace the inode of the log file.
-            multiline (bool): Treat multiple lines outputed at once as one message.
+            multiline (bool): Treat multiple lines outputted at once as one message.
             scantime (int): The range of time to scan.
             expiration (int): The expiration of seek files.
             cachetime (int): The period to cache the result.
             lock_timeout (int): The period to wait for if another process is running.
+            output_header (bool): Suppress the output of the message on matched lines.
             quiet (bool): Suppress output of matched lines.
 
         Args:
@@ -123,6 +128,7 @@ class LogChecker(object):
         """
         # set default value
         self.config = {}
+        self.config['dry_run'] = False
         self.config['logformat'] = LogChecker.FORMAT_SYSLOG
         self.config['state_directory'] = None
         self.config['pattern_list'] = []
@@ -139,7 +145,8 @@ class LogChecker(object):
         self.config['expiration'] = 691200
         self.config['cachetime'] = 60
         self.config['lock_timeout'] = 3
-        self.config['quiet'] = False
+        self.config['output_header'] = False
+        self.config['output_quiet'] = False
 
         # overwrite values with user's values
         for key in self.config:
@@ -162,6 +169,7 @@ class LogChecker(object):
 
         self.re_logformat = re.compile(LogChecker._expand_logformat_by_strftime(
             self.config['logformat']))
+        _debug("logformat='{0}'".format(self.re_logformat.pattern))
 
         # status variables
         self.state = None
@@ -307,17 +315,22 @@ class LogChecker(object):
 
     def _update_state(self):
         """Update the state of the result."""
+        output_mode = ""
+        if self.config['output_quiet']:
+            output_mode = "QUIET: "
+        elif self.config['output_header']:
+            output_mode = "HEADER: "
         num_critical = len(self.critical_found)
         if num_critical > 0:
             self.state = LogChecker.STATE_CRITICAL
-            self.messages.append("Critical Found {0} lines: {1}".format(
-                num_critical, ','.join(self.critical_found_messages)))
+            self.messages.append("Critical Found {0} lines: {1}{2}".format(
+                num_critical, output_mode, ','.join(self.critical_found_messages)))
         num = len(self.found)
         if num > 0:
             self.messages.append(
-                "Found {0} lines (limit={1}/{2}): {3}".format(
+                "Found {0} lines (limit={1}/{2}): {3}{4}".format(
                     num, self.config['warning'], self.config['critical'],
-                    ','.join(self.found_messages)))
+                    output_mode, ','.join(self.found_messages)))
             if self.config['critical'] > 0 and self.config['critical'] <= num:
                 if self.state is None:
                     self.state = LogChecker.STATE_CRITICAL
@@ -341,28 +354,29 @@ class LogChecker(object):
         self.message = message
         return
 
-    def _set_found(self, message, found, critical_found):
+    def _set_found(self, header, message, found, critical_found):
         """Set the found and critical_found if matching pattern is found."""
-        found_negpattern = self._find_pattern(message, negative=True)
+        _debug("header='{0}', message='{1}'".format(header, message))
+        log_message = ''.join([header, message])
+        found_negpattern = self._find_pattern(log_message, negative=True)
         found_critical_negpattern = self._find_pattern(
-            message, negative=True, critical=True)
+            log_message, negative=True, critical=True)
 
         if not found_negpattern and not found_critical_negpattern:
-            if self._find_pattern(message):
-                found.append(message)
+            if self._find_pattern(log_message):
+                found.append({"header": header, "message": message})
         if not found_critical_negpattern:
-            if self._find_pattern(message, critical=True):
-                critical_found.append(message)
+            if self._find_pattern(log_message, critical=True):
+                critical_found.append({"header": header, "message": message})
         return
 
     def _check_each_multiple_lines(
             self, logfile, start_position, found, critical_found):
         """Match the pattern each multiple lines in the log file."""
-        line_buffer = []
-        pre_key = None
-        cur_key = None
+        messages = []
+        previous_header = None
+        header = None
         message = None
-        cur_message = None
 
         with io.open(logfile, mode='r', encoding=self.config['encoding'],
                      errors='replace') as fileobj:
@@ -373,36 +387,37 @@ class LogChecker(object):
                 _debug("line='{0}'".format(line))
 
                 matchobj = self.re_logformat.match(line)
-                # set cur_key and cur_message.
                 if matchobj:
-                    cur_key = matchobj.group(1)
-                    cur_message = matchobj.group(2)
+                    header = matchobj.group(1)
+                    message = matchobj.group(2)
+                    _debug("  logformat: header='{0}', message='{1}'".format(
+                        header, message))
                 else:
-                    cur_key = pre_key
-                    cur_message = line
+                    _debug("  logformat: unmatched")
+                    if previous_header is None:
+                        if self.config['dry_run']:
+                            LogChecker.print_message("[DRY RUN] Log format does not match. Set --format option.")
+                            sys.exit(LogChecker.STATE_UNKNOWN)
+                        else:
+                            # If you do not enable dry run, ignore log format errors.
+                            previous_header = ''
+                    # assume it is continuation
+                    header = previous_header
+                    message = line
 
-                if pre_key is None:  # for first iteration
-                    pre_key = cur_key
-                    line_buffer.append(line)
-                elif pre_key == cur_key:
-                    line_buffer.append(cur_message)
-                else:
-                    message = ' '.join(line_buffer)
-                    _debug("message='{0}'".format(message))
-                    self._set_found(message, found, critical_found)
+                if previous_header is not None and previous_header != header:
+                    # The current line is a new log line.
+                    self._set_found(previous_header, ' '.join(messages), found, critical_found)
+                    messages = []
 
-                    # initialize variables for next loop
-                    pre_key = cur_key
-                    line_buffer = []
-                    line_buffer.append(line)
+                previous_header = header
+                messages.append(message)
             end_position = fileobj.tell()
             fileobj.close()
 
-        # flush line buffer
-        if line_buffer:
-            message = ' '.join(line_buffer)
-            _debug("message='{0}'".format(message))
-            self._set_found(message, found, critical_found)
+        # flush
+        if messages:
+            self._set_found(header, ' '.join(messages), found, critical_found)
         return end_position
 
     def _check_each_single_line(
@@ -413,9 +428,26 @@ class LogChecker(object):
             fileobj.seek(start_position, 0)
 
             for line in fileobj:
-                message = line.rstrip()
-                _debug("message='{0}'".format(message))
-                self._set_found(message, found, critical_found)
+                line = line.rstrip()
+                _debug("line='{0}'".format(line))
+
+                matchobj = self.re_logformat.match(line)
+                if matchobj:
+                    header = matchobj.group(1)
+                    message = matchobj.group(2)
+                    _debug("  logformat: header='{0}', message='{1}'".format(
+                        header, message))
+                else:
+                    _debug("  logformat: unmatched")
+                    if self.config['dry_run']:
+                        LogChecker.print_message("[DRY RUN] Log format does not match. Set --format option.")
+                        sys.exit(LogChecker.STATE_UNKNOWN)
+                    else:
+                        # If you do not enable dry run, ignore log format errors.
+                        header = ''
+                        message = line
+
+                self._set_found(header, message, found, critical_found)
             end_position = fileobj.tell()
             fileobj.close()
         return end_position
@@ -539,7 +571,7 @@ class LogChecker(object):
                     trace_inode=self.config['trace_inode'], tag=tag)
             self._check_log(logfile_pattern, seekfile)
 
-        if self.config['cachetime'] > 0:
+        if self.config['cachetime'] > 0 and not self.config['dry_run']:
             self._update_cache(cachefile)
 
         LogChecker.unlock(lockfile, lockfileobj)
@@ -589,22 +621,29 @@ class LogChecker(object):
 
         if found:
             self.found.extend(found)
-            if self.config['quiet']:
+            if self.config['output_quiet']:
                 self.found_messages.append(
                     "at {0}".format(logfile))
+            elif self.config['output_header']:
+                self.found_messages.append(
+                    "{0} at {1}".format(LogChecker._join_header(found), logfile))
             else:
                 self.found_messages.append(
-                    "{0} at {1}".format(','.join(found), logfile))
+                    "{0} at {1}".format(LogChecker._join_header_and_message(found) , logfile))
         if critical_found:
             self.critical_found.extend(critical_found)
-            if self.config['quiet']:
+            if self.config['output_quiet']:
                 self.critical_found_messages.append(
                     "at {0}".format(logfile))
+            elif self.config['output_header']:
+                self.critical_found_messages.append(
+                    "{0} at {1}".format(LogChecker._join_header(critical_found), logfile))
             else:
                 self.critical_found_messages.append(
-                    "{0} at {1}".format(','.join(critical_found), logfile))
+                    "{0} at {1}".format(LogChecker._join_header_and_message(critical_found), logfile))
 
-        LogChecker._update_seekfile(seekfile, end_position)
+        if not self.config['dry_run']:
+            LogChecker._update_seekfile(seekfile, end_position)
         return
 
     def check_log_multi(
@@ -792,6 +831,25 @@ class LogChecker(object):
         return offset
 
     @staticmethod
+    def _join_header(found):
+        """Join header."""
+        headers = []
+        for item in found:
+            if item['header']:
+                headers.append(item['header'])
+            else:
+                headers.append(item['message'])
+        return ','.join(headers)
+
+    @staticmethod
+    def _join_header_and_message(found):
+        """Join header and message."""
+        log_messages = []
+        for item in found:
+            log_messages.append(''.join([item['header'], item['message']]))
+        return ','.join(log_messages)
+
+    @staticmethod
     def lock(lockfile):
         """Lock.
 
@@ -943,6 +1001,14 @@ def _make_parser():
         version="%(prog)s {0}".format(__version__)
     )
     parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        dest="dry_run",
+        default=False,
+        help=("Do dry run. It does not update seek files and a cache file. "
+              "If log format is not correct, it prints an error message.")
+    )
+    parser.add_argument(
         "-l", "--logfile",
         action="store",
         dest="logfile_pattern",
@@ -960,7 +1026,8 @@ def _make_parser():
         metavar="<format>",
         default=LogChecker.FORMAT_SYSLOG,
         help=("Regular expression for log format. "
-              "It requires two groups in format of '^(TIMESTAMP and TAG)(.*)$'. "
+              "It requires two groups in format of '^(HEADER)(.*)$'. "
+              "HEADER includes TIMESTAMP, HOSTNAME, TAG and so on. "
               "Also, it may use %%%%, %%Y, %%y, %%a, %%b, %%m, %%d, %%e, %%H, "
               "%%M, %%S, %%F and %%T of strftime(3). "
               "(default: regular expression for syslog.")
@@ -1135,7 +1202,8 @@ def _make_parser():
         action="store_true",
         dest="multiline",
         default=False,
-        help=("Treat multiple lines outputed at once as one message. "
+        help=("Treat multiple lines outputted at once as one message. "
+              "If the log format is not syslog, set --format option. "
               "See also --format.")
     )
     parser.add_argument(
@@ -1161,11 +1229,21 @@ def _make_parser():
               "(default: %(default)s)")
     )
     parser.add_argument(
+        "-H", "--output-header",
+        action="store_true",
+        dest="output_header",
+        default=False,
+        help=("HEADER mode: Suppress the output of the message on matched lines. "
+              "Only HEADER(TIMESTAMP, HOSTNAME, TAG etc) is outputted. "
+              "If the log format is not syslog, set --format option. "
+              "See also --format.")
+    )
+    parser.add_argument(
         "-q", "--quiet",
         action="store_true",
-        dest="quiet",
+        dest="output_quiet",
         default=False,
-        help=("Suppress output of matched lines.")
+        help=("QUIET mode: Suppress the output of matched lines.")
     )
     return parser
 
@@ -1249,6 +1327,7 @@ def _generate_config(args):
 
     # set value of args
     config = {
+        "dry_run": args.dry_run,
         "logformat": args.logformat,
         "state_directory": state_directory,
         "pattern_list": pattern_list,
@@ -1265,7 +1344,8 @@ def _generate_config(args):
         "expiration": args.expiration,
         "cachetime": args.cachetime,
         "lock_timeout": args.lock_timeout,
-        "quiet": args.quiet
+        "output_header": args.output_header,
+        "output_quiet": args.output_quiet
     }
     return config
 
@@ -1281,7 +1361,10 @@ def main():
         remove_seekfile=args.remove_seekfile, tag=args.tag)
     state = log.get_state()
     message = log.get_message()
-    LogChecker.print_message(message)
+    if args.dry_run:
+        LogChecker.print_message("[DRY RUN] {0}".format(message))
+    else:
+        LogChecker.print_message(message)
     sys.exit(state)
 
 

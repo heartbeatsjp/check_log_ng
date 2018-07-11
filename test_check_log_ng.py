@@ -24,13 +24,16 @@ class LogCheckerTestCase(unittest.TestCase):
     # Class constant
     MESSAGE_OK = "OK - No matches found."
     MESSAGE_WARNING_ONE = "WARNING: Found 1 lines (limit=1/0): {0} at {1}"
-    MESSAGE_WARNING_ONE_WITH_QUIET = "WARNING: Found 1 lines (limit=1/0): at {0}"
+    MESSAGE_WARNING_ONE_WITH_QUIET = "WARNING: Found 1 lines (limit=1/0): QUIET: at {0}"
+    MESSAGE_WARNING_ONE_WITH_HEADER = "WARNING: Found 1 lines (limit=1/0): HEADER: {0} at {1}"
     MESSAGE_WARNING_TWO = "WARNING: Found 2 lines (limit=1/0): {0},{1} at {2}"
-    MESSAGE_WARNING_TWO_WITH_QUIET = "WARNING: Found 2 lines (limit=1/0): at {0}"
+    MESSAGE_WARNING_TWO_WITH_QUIET = "WARNING: Found 2 lines (limit=1/0): QUIET: at {0}"
+    MESSAGE_WARNING_TWO_WITH_HEADER = "WARNING: Found 2 lines (limit=1/0): HEADER: {0},{1} at {2}"
     MESSAGE_WARNING_TWO_IN_TWO_FILES = (
         "WARNING: Found 2 lines (limit=1/0): {0} at {1},{2} at {3}")
     MESSAGE_CRITICAL_ONE = "CRITICAL: Critical Found 1 lines: {0} at {1}"
-    MESSAGE_CRITICAL_ONE_WITH_QUIET = "CRITICAL: Critical Found 1 lines: at {0}"
+    MESSAGE_CRITICAL_ONE_WITH_QUIET = "CRITICAL: Critical Found 1 lines: QUIET: at {0}"
+    MESSAGE_CRITICAL_ONE_WITH_HEADER = "CRITICAL: Critical Found 1 lines: HEADER: {0} at {1}"
     MESSAGE_UNKNOWN_LOCK_TIMEOUT = (
         "UNKNOWN: Lock timeout. Another process is running.")
 
@@ -128,7 +131,7 @@ class LogCheckerTestCase(unittest.TestCase):
     def test_format(self):
         """--format option
         """
-        self.config["logformat"] = r"^(\[%a %b %d %T %Y\] \[\S+\]) (.*)$"
+        self.config["logformat"] = r"^(\[%a %b %d %T %Y\] \[\S+\] )(.*)$"
         self.config["pattern_list"] = ["ERROR"]
         log = LogChecker(self.config)
 
@@ -188,7 +191,7 @@ class LogCheckerTestCase(unittest.TestCase):
         """--pattern and --quiet options
         """
         self.config["pattern_list"] = ["ERROR"]
-        self.config["quiet"] = True
+        self.config['output_quiet'] = True
         log = LogChecker(self.config)
 
         # 1 line matched
@@ -226,6 +229,53 @@ class LogCheckerTestCase(unittest.TestCase):
         self.assertEqual(log.get_state(), LogChecker.STATE_OK)
         self.assertEqual(log.get_message(), self.MESSAGE_OK)
 
+    def test_pattern_with_header(self):
+        """--pattern and --header options
+        """
+        self.config["pattern_list"] = ["ERROR"]
+        self.config['output_header'] = True
+        log = LogChecker(self.config)
+
+        # 1 line matched
+        # Dec  5 12:34:50 hostname test: ERROR
+        timestamp = self._get_timestamp()
+        line1 = self._make_line(timestamp, "test", "ERROR")
+        header1 = self._make_line(timestamp, "test", "")
+        self._write_logfile(self.logfile, line1)
+        log.check(self.logfile)
+
+        self.assertEqual(log.get_state(), LogChecker.STATE_WARNING)
+        self.assertEqual(
+            log.get_message(),
+            self.MESSAGE_WARNING_ONE_WITH_HEADER.format(header1, self.logfile))
+
+        # 2 lines matched
+        # Dec  5 12:34:50 hostname test: ERROR1
+        # Dec  5 12:34:50 hostname test: ERROR2
+        timestamp = self._get_timestamp()
+        line2 = self._make_line(timestamp, "test", "ERROR1")
+        line3 = self._make_line(timestamp, "test", "ERROR2")
+        header2 = self._make_line(timestamp, "test", "")
+        header3 = self._make_line(timestamp, "test", "")
+        self._write_logfile(self.logfile, [line2, line3])
+        log.clear_state()
+        log.check(self.logfile)
+
+        self.assertEqual(log.get_state(), LogChecker.STATE_WARNING)
+        self.assertEqual(
+            log.get_message(),
+            self.MESSAGE_WARNING_TWO_WITH_HEADER.format(header2, header3, self.logfile))
+
+        # no line matched
+        # Dec  5 12:34:50 hostname noop: NOOP
+        line4 = self._make_line(self._get_timestamp(), "noop", "NOOP")
+        self._write_logfile(self.logfile, line4)
+        log.clear_state()
+        log.check(self.logfile)
+
+        self.assertEqual(log.get_state(), LogChecker.STATE_OK)
+        self.assertEqual(log.get_message(), self.MESSAGE_OK)
+
     def test_critical_pattern(self):
         """--critical-pattern option
         """
@@ -243,10 +293,10 @@ class LogCheckerTestCase(unittest.TestCase):
             self.MESSAGE_CRITICAL_ONE.format(line, self.logfile))
 
     def test_critical_pattern_with_quiet(self):
-        """--critical-pattern and -quiet options
+        """--critical-pattern and --quiet options
         """
         self.config["critical_pattern_list"] = ["FATAL"]
-        self.config["quiet"] = True
+        self.config['output_quiet'] = True
         log = LogChecker(self.config)
 
         # Dec  5 12:34:50 hostname test: FATAL
@@ -258,6 +308,25 @@ class LogCheckerTestCase(unittest.TestCase):
         self.assertEqual(
             log.get_message(),
             self.MESSAGE_CRITICAL_ONE_WITH_QUIET.format(self.logfile))
+
+    def test_critical_pattern_with_header(self):
+        """--critical-pattern and --header options
+        """
+        self.config["critical_pattern_list"] = ["FATAL"]
+        self.config['output_header'] = True
+        log = LogChecker(self.config)
+
+        # Dec  5 12:34:50 hostname test: FATAL
+        timestamp = self._get_timestamp()
+        line = self._make_line(timestamp, "test", "FATAL")
+        header = self._make_line(timestamp, "test", "")
+        self._write_logfile(self.logfile, line)
+        log.check(self.logfile)
+
+        self.assertEqual(log.get_state(), LogChecker.STATE_CRITICAL)
+        self.assertEqual(
+            log.get_message(),
+            self.MESSAGE_CRITICAL_ONE_WITH_HEADER.format(header, self.logfile))
 
     def test_negpattern(self):
         """--negpattern option
