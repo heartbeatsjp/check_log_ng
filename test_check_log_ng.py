@@ -24,10 +24,16 @@ class LogCheckerTestCase(unittest.TestCase):
     # Class constant
     MESSAGE_OK = "OK - No matches found."
     MESSAGE_WARNING_ONE = "WARNING: Found 1 lines (limit=1/0): {0} at {1}"
+    MESSAGE_WARNING_ONE_WITH_QUIET = "WARNING: Found 1 lines (limit=1/0, QUIET): at {0}"
+    MESSAGE_WARNING_ONE_WITH_HEADER = "WARNING: Found 1 lines (limit=1/0, HEADER): {0} at {1}"
     MESSAGE_WARNING_TWO = "WARNING: Found 2 lines (limit=1/0): {0},{1} at {2}"
+    MESSAGE_WARNING_TWO_WITH_QUIET = "WARNING: Found 2 lines (limit=1/0, QUIET): at {0}"
+    MESSAGE_WARNING_TWO_WITH_HEADER = "WARNING: Found 2 lines (limit=1/0, HEADER): {0},{1} at {2}"
     MESSAGE_WARNING_TWO_IN_TWO_FILES = (
         "WARNING: Found 2 lines (limit=1/0): {0} at {1},{2} at {3}")
     MESSAGE_CRITICAL_ONE = "CRITICAL: Critical Found 1 lines: {0} at {1}"
+    MESSAGE_CRITICAL_ONE_WITH_QUIET = "CRITICAL: Critical Found 1 lines (QUIET): at {0}"
+    MESSAGE_CRITICAL_ONE_WITH_HEADER = "CRITICAL: Critical Found 1 lines (HEADER): {0} at {1}"
     MESSAGE_UNKNOWN_LOCK_TIMEOUT = (
         "UNKNOWN: Lock timeout. Another process is running.")
 
@@ -122,10 +128,50 @@ class LogCheckerTestCase(unittest.TestCase):
             if os.path.exists(lockfile):
                 os.unlink(lockfile)
 
+    def test_dry_run(self):
+        """--dry-run option
+        """
+        self.config["pattern_list"] = ["ERROR"]
+        log = LogChecker(self.config)
+
+        # create a seek file
+        # Dec  5 12:34:50 hostname noop: NOOP
+        line4 = self._make_line(self._get_timestamp(), "noop", "NOOP")
+        self._write_logfile(self.logfile, line4)
+        log.clear_state()
+        log.check(self.logfile)
+
+        self.assertEqual(log.get_state(), LogChecker.STATE_OK)
+        self.assertEqual(log.get_message(), self.MESSAGE_OK)
+
+        # verify a seek file is not updated.
+        self.config["dry_run"] = True
+        log = LogChecker(self.config)
+
+        # Dec  5 12:34:50 hostname test: ERROR
+        line = self._make_line(self._get_timestamp(), "test", "ERROR")
+        self._write_logfile(self.logfile, line)
+
+        log.clear_state()
+        log.check(self.logfile)
+
+        self.assertEqual(log.get_state(), LogChecker.STATE_WARNING)
+        self.assertEqual(
+            log.get_message(),
+            self.MESSAGE_WARNING_ONE.format(line, self.logfile))
+
+        log.clear_state()
+        log.check(self.logfile)
+
+        self.assertEqual(log.get_state(), LogChecker.STATE_WARNING)
+        self.assertEqual(
+            log.get_message(),
+            self.MESSAGE_WARNING_ONE.format(line, self.logfile))
+
     def test_format(self):
         """--format option
         """
-        self.config["logformat"] = r"^(\[%a %b %d %T %Y\] \[\S+\]) (.*)$"
+        self.config["logformat"] = r"^(\[%a %b %d %T %Y\] \[\S+\] )(.*)$"
         self.config["pattern_list"] = ["ERROR"]
         log = LogChecker(self.config)
 
@@ -181,6 +227,95 @@ class LogCheckerTestCase(unittest.TestCase):
         self.assertEqual(log.get_state(), LogChecker.STATE_OK)
         self.assertEqual(log.get_message(), self.MESSAGE_OK)
 
+    def test_pattern_with_quiet(self):
+        """--pattern and --quiet options
+        """
+        self.config["pattern_list"] = ["ERROR"]
+        self.config['output_quiet'] = True
+        log = LogChecker(self.config)
+
+        # 1 line matched
+        # Dec  5 12:34:50 hostname test: ERROR
+        line1 = self._make_line(self._get_timestamp(), "test", "ERROR")
+        self._write_logfile(self.logfile, line1)
+        log.check(self.logfile)
+
+        self.assertEqual(log.get_state(), LogChecker.STATE_WARNING)
+        self.assertEqual(
+            log.get_message(),
+            self.MESSAGE_WARNING_ONE_WITH_QUIET.format(self.logfile))
+
+        # 2 lines matched
+        # Dec  5 12:34:50 hostname test: ERROR1
+        # Dec  5 12:34:50 hostname test: ERROR2
+        line2 = self._make_line(self._get_timestamp(), "test", "ERROR1")
+        line3 = self._make_line(self._get_timestamp(), "test", "ERROR2")
+        self._write_logfile(self.logfile, [line2, line3])
+        log.clear_state()
+        log.check(self.logfile)
+
+        self.assertEqual(log.get_state(), LogChecker.STATE_WARNING)
+        self.assertEqual(
+            log.get_message(),
+            self.MESSAGE_WARNING_TWO_WITH_QUIET.format(self.logfile))
+
+        # no line matched
+        # Dec  5 12:34:50 hostname noop: NOOP
+        line4 = self._make_line(self._get_timestamp(), "noop", "NOOP")
+        self._write_logfile(self.logfile, line4)
+        log.clear_state()
+        log.check(self.logfile)
+
+        self.assertEqual(log.get_state(), LogChecker.STATE_OK)
+        self.assertEqual(log.get_message(), self.MESSAGE_OK)
+
+    def test_pattern_with_header(self):
+        """--pattern and --header options
+        """
+        self.config["pattern_list"] = ["ERROR"]
+        self.config['output_header'] = True
+        log = LogChecker(self.config)
+
+        # 1 line matched
+        # Dec  5 12:34:50 hostname test: ERROR
+        timestamp = self._get_timestamp()
+        line1 = self._make_line(timestamp, "test", "ERROR")
+        header1 = self._make_line(timestamp, "test", "")
+        self._write_logfile(self.logfile, line1)
+        log.check(self.logfile)
+
+        self.assertEqual(log.get_state(), LogChecker.STATE_WARNING)
+        self.assertEqual(
+            log.get_message(),
+            self.MESSAGE_WARNING_ONE_WITH_HEADER.format(header1, self.logfile))
+
+        # 2 lines matched
+        # Dec  5 12:34:50 hostname test: ERROR1
+        # Dec  5 12:34:50 hostname test: ERROR2
+        timestamp = self._get_timestamp()
+        line2 = self._make_line(timestamp, "test", "ERROR1")
+        line3 = self._make_line(timestamp, "test", "ERROR2")
+        header2 = self._make_line(timestamp, "test", "")
+        header3 = self._make_line(timestamp, "test", "")
+        self._write_logfile(self.logfile, [line2, line3])
+        log.clear_state()
+        log.check(self.logfile)
+
+        self.assertEqual(log.get_state(), LogChecker.STATE_WARNING)
+        self.assertEqual(
+            log.get_message(),
+            self.MESSAGE_WARNING_TWO_WITH_HEADER.format(header2, header3, self.logfile))
+
+        # no line matched
+        # Dec  5 12:34:50 hostname noop: NOOP
+        line4 = self._make_line(self._get_timestamp(), "noop", "NOOP")
+        self._write_logfile(self.logfile, line4)
+        log.clear_state()
+        log.check(self.logfile)
+
+        self.assertEqual(log.get_state(), LogChecker.STATE_OK)
+        self.assertEqual(log.get_message(), self.MESSAGE_OK)
+
     def test_critical_pattern(self):
         """--critical-pattern option
         """
@@ -196,6 +331,42 @@ class LogCheckerTestCase(unittest.TestCase):
         self.assertEqual(
             log.get_message(),
             self.MESSAGE_CRITICAL_ONE.format(line, self.logfile))
+
+    def test_critical_pattern_with_quiet(self):
+        """--critical-pattern and --quiet options
+        """
+        self.config["critical_pattern_list"] = ["FATAL"]
+        self.config['output_quiet'] = True
+        log = LogChecker(self.config)
+
+        # Dec  5 12:34:50 hostname test: FATAL
+        line = self._make_line(self._get_timestamp(), "test", "FATAL")
+        self._write_logfile(self.logfile, line)
+        log.check(self.logfile)
+
+        self.assertEqual(log.get_state(), LogChecker.STATE_CRITICAL)
+        self.assertEqual(
+            log.get_message(),
+            self.MESSAGE_CRITICAL_ONE_WITH_QUIET.format(self.logfile))
+
+    def test_critical_pattern_with_header(self):
+        """--critical-pattern and --header options
+        """
+        self.config["critical_pattern_list"] = ["FATAL"]
+        self.config['output_header'] = True
+        log = LogChecker(self.config)
+
+        # Dec  5 12:34:50 hostname test: FATAL
+        timestamp = self._get_timestamp()
+        line = self._make_line(timestamp, "test", "FATAL")
+        header = self._make_line(timestamp, "test", "")
+        self._write_logfile(self.logfile, line)
+        log.check(self.logfile)
+
+        self.assertEqual(log.get_state(), LogChecker.STATE_CRITICAL)
+        self.assertEqual(
+            log.get_message(),
+            self.MESSAGE_CRITICAL_ONE_WITH_HEADER.format(header, self.logfile))
 
     def test_negpattern(self):
         """--negpattern option
@@ -563,6 +734,67 @@ class LogCheckerTestCase(unittest.TestCase):
         self.assertFalse(os.path.exists(self.seekfile1))
         self.assertTrue(os.path.exists(self.seekfile2))
 
+    def test_remove_seekfile_with_dry_run(self):
+        """--expiration, --remove-seekfile, and --dry-run options
+        """
+        self.config["pattern_list"] = ["ERROR"]
+        self.config["scantime"] = 2
+        self.config["expiration"] = 4
+        log = LogChecker(self.config)
+
+        # within expiration
+        # Dec  5 12:34:50 hostname test: ERROR
+        line1 = self._make_line(self._get_timestamp(), "test", "ERROR")
+        self._write_logfile(self.logfile1, line1)
+
+        log.check(self.logfile_pattern, remove_seekfile=True)
+        self.seekfile1 = log._create_seek_filename(
+            self.logfile_pattern, self.logfile1)
+        time.sleep(2)
+
+        # Dec  5 12:34:54 hostname test: ERROR
+        line2 = self._make_line(self._get_timestamp(), "test", "ERROR")
+        self._write_logfile(self.logfile2, line2)
+
+        # seek file of logfile1 should not be purged.
+        log.clear_state()
+        log.check(self.logfile_pattern, remove_seekfile=True)
+        self.seekfile2 = log._create_seek_filename(
+            self.logfile_pattern, self.logfile2)
+
+        self.assertEqual(log.get_state(), LogChecker.STATE_WARNING)
+        self.assertEqual(
+            log.get_message(),
+            self.MESSAGE_WARNING_ONE.format(line2, self.logfile2))
+        self.assertTrue(os.path.exists(self.seekfile1))
+        self.assertTrue(os.path.exists(self.seekfile2))
+
+        # with dry run
+        self.config["dry_run"] = True
+        log = LogChecker(self.config)
+
+        # over expiration
+        # Dec  5 12:34:50 hostname test: ERROR
+        line1 = self._make_line(self._get_timestamp(), "test", "ERROR")
+        self._write_logfile(self.logfile1, line1)
+
+        log.check(self.logfile_pattern, remove_seekfile=True)
+        time.sleep(6)
+
+        # Dec  5 12:34:54 hostname test: ERROR
+        line2 = self._make_line(self._get_timestamp(), "test", "ERROR")
+        self._write_logfile(self.logfile2, line2)
+
+        log.clear_state()
+        log.check(self.logfile_pattern, remove_seekfile=True)
+
+        self.assertEqual(log.get_state(), LogChecker.STATE_WARNING)
+        self.assertEqual(
+            log.get_message(),
+            self.MESSAGE_WARNING_ONE.format(line2, self.logfile2))
+        self.assertTrue(os.path.exists(self.seekfile1))
+        self.assertTrue(os.path.exists(self.seekfile2))
+
     def test_remove_seekfile_inode(self):
         """--trace_inode, --expiration and --remove-seekfile options
         """
@@ -616,6 +848,64 @@ class LogCheckerTestCase(unittest.TestCase):
             self.MESSAGE_WARNING_ONE.format(line3, self.logfile1))
         self.assertEqual(seekfile_1, seekfile1_2)
         self.assertFalse(os.path.exists(seekfile1_1))
+        self.assertTrue(os.path.exists(seekfile1_2))
+
+    def test_remove_seekfile_inode_with_dry_run(self):
+        """--trace_inode, --expiration, --remove-seekfile, and --dry-run options
+        """
+        self.config["pattern_list"] = ["ERROR"]
+        self.config["trace_inode"] = True
+        self.config["scantime"] = 2
+        self.config["expiration"] = 3
+        log = LogChecker(self.config)
+
+        # create logfile
+        # Dec  5 12:34:50 hostname test: ERROR
+        line1 = self._make_line(self._get_timestamp(), "test", "ERROR")
+        self._write_logfile(self.logfile, line1)
+
+        # log rotation
+        os.rename(self.logfile, self.logfile1)
+
+        # create new logfile
+        # Dec  5 12:34:50 hostname test: ERROR
+        line2 = self._make_line(self._get_timestamp(), "test", "ERROR")
+        self._write_logfile(self.logfile, line2)
+
+        # do check_log_multi, and create seekfile and seekfile1
+        log.clear_state()
+        log.check(self.logfile_pattern, remove_seekfile=True)
+        seekfile_1 = log._create_seek_filename(
+            self.logfile_pattern, self.logfile, trace_inode=True)
+        seekfile1_1 = log._create_seek_filename(
+            self.logfile_pattern, self.logfile1, trace_inode=True)
+        time.sleep(4)
+
+        # update logfile
+        # Dec  5 12:34:54 hostname test: ERROR
+        line3 = self._make_line(self._get_timestamp(), "test", "ERROR")
+        self._write_logfile(self.logfile, line3)
+
+        # log rotation, purge old logfile2
+        os.rename(self.logfile1, self.logfile2)
+        os.rename(self.logfile, self.logfile1)
+
+        # with dry run
+        self.config["dry_run"] = True
+        log = LogChecker(self.config)
+
+        log.clear_state()
+        log.check(
+            self.logfile_pattern, remove_seekfile=True)
+        seekfile1_2 = log._create_seek_filename(
+            self.logfile_pattern, self.logfile1, trace_inode=True)
+
+        self.assertEqual(log.get_state(), LogChecker.STATE_WARNING)
+        self.assertEqual(
+            log.get_message(),
+            self.MESSAGE_WARNING_ONE.format(line3, self.logfile1))
+        self.assertEqual(seekfile_1, seekfile1_2)
+        self.assertTrue(os.path.exists(seekfile1_1))
         self.assertTrue(os.path.exists(seekfile1_2))
 
     def test_replace_pipe_symbol(self):
@@ -770,6 +1060,59 @@ class LogCheckerTestCase(unittest.TestCase):
         log.check(self.logfile)
 
         self.assertEqual(log.get_state(), LogChecker.STATE_OK)
+
+        log._remove_cache(cachefile)
+
+    def test_cachetime_with_dry_run(self):
+        """--cachetime and --dry-run
+        """
+        self.config["pattern_list"] = ["ERROR"]
+        self.config["cachetime"] = 60
+        log = LogChecker(self.config)
+
+        cachefile = log._create_cache_filename(self.logfile)
+
+        # create a cache file
+        # Dec  5 12:34:50 hostname test: ERROR
+        line = self._make_line(self._get_timestamp(), "test", "ERROR")
+        self._write_logfile(self.logfile, line)
+
+        log.clear_state()
+        log.check(self.logfile)
+
+        self.assertEqual(log.get_state(), LogChecker.STATE_WARNING)
+        self.assertEqual(
+            log.get_message(),
+            self.MESSAGE_WARNING_ONE.format(line, self.logfile))
+
+        # verify it does not read a cache file.
+        self.config["dry_run"] = True
+        log = LogChecker(self.config)
+
+        # Dec  5 12:34:50 hostname test: NOOP
+        line = self._make_line(self._get_timestamp(), "test", "NOOP")
+        self._write_logfile(self.logfile, line)
+
+        log.clear_state()
+        log.check(self.logfile)
+
+        self.assertEqual(log.get_state(), LogChecker.STATE_OK)
+
+        # verify a cache file is not updated.
+        self.config["dry_run"] = False
+        log = LogChecker(self.config)
+
+        # Dec  5 12:34:50 hostname test: ERROR
+        line = self._make_line(self._get_timestamp(), "test", "ERROR")
+        self._write_logfile(self.logfile, line)
+
+        log.clear_state()
+        log.check(self.logfile)
+
+        self.assertEqual(log.get_state(), LogChecker.STATE_WARNING)
+        self.assertEqual(
+            log.get_message(),
+            self.MESSAGE_WARNING_ONE.format(line, self.logfile))
 
         log._remove_cache(cachefile)
 

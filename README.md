@@ -11,7 +11,7 @@ Features are as follows:
 - You can specify the character encoding of a log file.
 - You can check multiple log files at once and also check log-rotated files.
 - This script uses seek files which record the position where the check is completed for each log file. With these seek files, you can check only the differences from the last check.
-- You can check multiple lines outputed at once as one message.
+- You can check multiple lines outputted at once as one message.
 - The result can be cached within the specified time period. This will help multiple monitoring servers and multiple attempts.
 
 Originally, this script had be inspired by [`check_log3.pl`](https://exchange.nagios.org/directory/Plugins/Log-Files/check_log3-2Epl/details).
@@ -69,7 +69,8 @@ check_log_ng.py -i -p 'ERROR' -S /var/spool/check_log_ng -l '/var/log/messages'
 
 ### Multiple lines
 
-When output to multiple lines at the same time such as the following, you can add `-F <format>` and `-M` option.
+When output to multiple lines at the same time such as the following, you can add `-M` option.
+If the log format is not syslog, you must add -F/--format option.
 
 ```
 2013/12/05 09:36:51,024 jobs-thread-5 ERROR ~ *** Called URI is: https://www.example.com/submit
@@ -88,7 +89,7 @@ This is considered a message like the following:
 
 ### Multiple monitoring items
 
-If you want use multiple monitoring items, you can add '-T <tag>' option to prevent name collisions of seek files.
+If you want use multiple monitoring items, you can add `-T <tag>` option to prevent name collisions of seek files.
 
 ~~~sh
 check_log_ng.py -T 'log_error' -p 'ERROR' -S /var/spool/check_log_ng -l '/var/log/messages'
@@ -121,6 +122,57 @@ If it is one month, you can add `-E 2764800`, which is 32 days.
 
 ~~~sh
 check_log_ng.py -I -R -E 2764800 -p 'ERROR' -S /var/spool/check_log_ng -l '/var/log/messages*'
+~~~
+
+### Suppress output
+
+If you want to reduce the size of the output by suppressing the message, 
+you can add `-H` or `-q`.
+
+#### Example not to suppress
+
+~~~sh
+check_log_ng.py -p 'ERROR' -S /var/spool/check_log_ng -l '/var/log/messages'
+~~~
+
+Outout:
+
+~~~
+WARNING: Found 1 lines (limit=1/0): Jul 11 06:44:22 hostname app: ERROR Unable to access to 192.0.2.1 at /var/log/messages
+~~~
+
+#### Example to use `-H/--output-header`
+
+~~~sh
+check_log_ng.py -p 'ERROR' -H -S /var/spool/check_log_ng -l '/var/log/messages'
+~~~
+
+Outout:
+
+~~~
+WARNING: Found 1 lines (limit=1/0, HEADER): Jul 11 06:44:22 hostname app:  at /var/log/messages
+~~~
+
+#### Example to use `-q/--quiet`
+
+~~~sh
+check_log_ng.py -p 'ERROR' -Q -S /var/spool/check_log_ng -l '/var/log/messages'
+~~~
+
+Outout:
+
+~~~
+WARNING: Found 1 lines (limit=1/0, QUIET): at /var/log/messages
+~~~
+
+### Dry run
+
+If you want to do dry run, you can add `--dry-run` option.
+It does not update seek files and a cache file.
+If log format is not correct, it prints error.
+
+~~~sh
+check_log_ng.py --dry-run -p 'ERROR' -S /var/spool/check_log_ng -l '/var/log/messages'
 ~~~
 
 
@@ -192,6 +244,9 @@ A log file regular expression-based parser plugin for Nagios.
 optional arguments:
   -h, --help            show this help message and exit
   --version             show program's version number and exit
+  --dry-run             Do dry run. It does not update seek files and a cache
+                        file. If log format is not correct, it prints an error
+                        message.
   -l <filename>, --logfile <filename>
                         The file names of log files to be scanned. The
                         metacharacters * and ? are available. To set multiple
@@ -199,10 +254,11 @@ optional arguments:
                         --scantime.
   -F <format>, --format <format>
                         Regular expression for log format. It requires two
-                        groups in format of '^(TIMESTAMP and TAG)(.*)$'. Also,
-                        it may use %%, %Y, %y, %a, %b, %m, %d, %e, %H, %M, %S,
-                        %F and %T of strftime(3). (default: regular expression
-                        for syslog.
+                        groups in format of '^(HEADER)(.*)$'. HEADER includes
+                        TIMESTAMP, HOSTNAME, TAG and so on. Also, it may use
+                        %%, %Y, %y, %a, %b, %m, %d, %e, %H, %M, %S, %F and %T
+                        of strftime(3). (default: regular expression for
+                        syslog.
   -s <filename>, --seekfile <filename>
                         Deprecated. Use -S option instead. The file name of
                         the file to store the seek position of the last scan.
@@ -264,7 +320,8 @@ optional arguments:
                         deleted with -R option. (default: 691200)
   -R, --remove-seekfile
                         Remove expired seek files. See also --expiration.
-  -M, --multiline       Treat multiple lines outputed at once as one message.
+  -M, --multiline       Treat multiple lines outputted at once as one message.
+                        If the log format is not syslog, set --format option.
                         See also --format.
   --cachetime <seconds>
                         The period to cache the result. To disable this cache
@@ -272,6 +329,11 @@ optional arguments:
   --lock-timeout <seconds>
                         The period to wait for if another process is running.
                         If timeout occurs, UNKNOWN is returned. (default: 3)
+  -H, --output-header   HEADER mode: Suppress the output of the message on
+                        matched lines. Only HEADER(TIMESTAMP, HOSTNAME, TAG
+                        etc) is outputted. If the log format is not syslog,
+                        set --format option. See also --format.
+  -q, --quiet           QUIET mode: Suppress the output of matched lines.
 ```
 
 ## Contributing
