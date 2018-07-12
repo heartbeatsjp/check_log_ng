@@ -168,8 +168,8 @@ WARNING: Found 1 lines (limit=1/0, QUIET): at /var/log/messages
 ### Dry run
 
 If you want to do dry run, you can add `--dry-run` option.
-It does not update seek files and a cache file.
-If log format is not correct, it prints error.
+The seek files are not updated and cache file is not used.
+If log format is not correct, it prints an error message.
 
 ~~~sh
 check_log_ng.py --dry-run -p 'ERROR' -S /var/spool/check_log_ng -l '/var/log/messages'
@@ -244,9 +244,9 @@ A log file regular expression-based parser plugin for Nagios.
 optional arguments:
   -h, --help            show this help message and exit
   --version             show program's version number and exit
-  --dry-run             Do dry run. It does not update seek files and a cache
-                        file. If log format is not correct, it prints an error
-                        message.
+  --dry-run             Do dry run. The seek files are not updated and cache
+                        file is not used. If log format is not correct, it
+                        prints an error message.
   -l <filename>, --logfile <filename>
                         The file names of log files to be scanned. The
                         metacharacters * and ? are available. To set multiple
