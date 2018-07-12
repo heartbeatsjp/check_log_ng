@@ -128,6 +128,46 @@ class LogCheckerTestCase(unittest.TestCase):
             if os.path.exists(lockfile):
                 os.unlink(lockfile)
 
+    def test_dry_run(self):
+        """--dry-run option
+        """
+        self.config["pattern_list"] = ["ERROR"]
+        log = LogChecker(self.config)
+
+        # create a seek file
+        # Dec  5 12:34:50 hostname noop: NOOP
+        line4 = self._make_line(self._get_timestamp(), "noop", "NOOP")
+        self._write_logfile(self.logfile, line4)
+        log.clear_state()
+        log.check(self.logfile)
+
+        self.assertEqual(log.get_state(), LogChecker.STATE_OK)
+        self.assertEqual(log.get_message(), self.MESSAGE_OK)
+
+        # verify a seek file is not updated.
+        self.config["dry_run"] = True
+        log = LogChecker(self.config)
+
+        # Dec  5 12:34:50 hostname test: ERROR
+        line = self._make_line(self._get_timestamp(), "test", "ERROR")
+        self._write_logfile(self.logfile, line)
+
+        log.clear_state()
+        log.check(self.logfile)
+
+        self.assertEqual(log.get_state(), LogChecker.STATE_WARNING)
+        self.assertEqual(
+            log.get_message(),
+            self.MESSAGE_WARNING_ONE.format(line, self.logfile))
+
+        log.clear_state()
+        log.check(self.logfile)
+
+        self.assertEqual(log.get_state(), LogChecker.STATE_WARNING)
+        self.assertEqual(
+            log.get_message(),
+            self.MESSAGE_WARNING_ONE.format(line, self.logfile))
+
     def test_format(self):
         """--format option
         """
@@ -694,6 +734,67 @@ class LogCheckerTestCase(unittest.TestCase):
         self.assertFalse(os.path.exists(self.seekfile1))
         self.assertTrue(os.path.exists(self.seekfile2))
 
+    def test_remove_seekfile_with_dry_run(self):
+        """--expiration, --remove-seekfile, and --dry-run options
+        """
+        self.config["pattern_list"] = ["ERROR"]
+        self.config["scantime"] = 2
+        self.config["expiration"] = 4
+        log = LogChecker(self.config)
+
+        # within expiration
+        # Dec  5 12:34:50 hostname test: ERROR
+        line1 = self._make_line(self._get_timestamp(), "test", "ERROR")
+        self._write_logfile(self.logfile1, line1)
+
+        log.check(self.logfile_pattern, remove_seekfile=True)
+        self.seekfile1 = log._create_seek_filename(
+            self.logfile_pattern, self.logfile1)
+        time.sleep(2)
+
+        # Dec  5 12:34:54 hostname test: ERROR
+        line2 = self._make_line(self._get_timestamp(), "test", "ERROR")
+        self._write_logfile(self.logfile2, line2)
+
+        # seek file of logfile1 should not be purged.
+        log.clear_state()
+        log.check(self.logfile_pattern, remove_seekfile=True)
+        self.seekfile2 = log._create_seek_filename(
+            self.logfile_pattern, self.logfile2)
+
+        self.assertEqual(log.get_state(), LogChecker.STATE_WARNING)
+        self.assertEqual(
+            log.get_message(),
+            self.MESSAGE_WARNING_ONE.format(line2, self.logfile2))
+        self.assertTrue(os.path.exists(self.seekfile1))
+        self.assertTrue(os.path.exists(self.seekfile2))
+
+        # with dry run
+        self.config["dry_run"] = True
+        log = LogChecker(self.config)
+
+        # over expiration
+        # Dec  5 12:34:50 hostname test: ERROR
+        line1 = self._make_line(self._get_timestamp(), "test", "ERROR")
+        self._write_logfile(self.logfile1, line1)
+
+        log.check(self.logfile_pattern, remove_seekfile=True)
+        time.sleep(6)
+
+        # Dec  5 12:34:54 hostname test: ERROR
+        line2 = self._make_line(self._get_timestamp(), "test", "ERROR")
+        self._write_logfile(self.logfile2, line2)
+
+        log.clear_state()
+        log.check(self.logfile_pattern, remove_seekfile=True)
+
+        self.assertEqual(log.get_state(), LogChecker.STATE_WARNING)
+        self.assertEqual(
+            log.get_message(),
+            self.MESSAGE_WARNING_ONE.format(line2, self.logfile2))
+        self.assertTrue(os.path.exists(self.seekfile1))
+        self.assertTrue(os.path.exists(self.seekfile2))
+
     def test_remove_seekfile_inode(self):
         """--trace_inode, --expiration and --remove-seekfile options
         """
@@ -747,6 +848,64 @@ class LogCheckerTestCase(unittest.TestCase):
             self.MESSAGE_WARNING_ONE.format(line3, self.logfile1))
         self.assertEqual(seekfile_1, seekfile1_2)
         self.assertFalse(os.path.exists(seekfile1_1))
+        self.assertTrue(os.path.exists(seekfile1_2))
+
+    def test_remove_seekfile_inode_with_dry_run(self):
+        """--trace_inode, --expiration, --remove-seekfile, and --dry-run options
+        """
+        self.config["pattern_list"] = ["ERROR"]
+        self.config["trace_inode"] = True
+        self.config["scantime"] = 2
+        self.config["expiration"] = 3
+        log = LogChecker(self.config)
+
+        # create logfile
+        # Dec  5 12:34:50 hostname test: ERROR
+        line1 = self._make_line(self._get_timestamp(), "test", "ERROR")
+        self._write_logfile(self.logfile, line1)
+
+        # log rotation
+        os.rename(self.logfile, self.logfile1)
+
+        # create new logfile
+        # Dec  5 12:34:50 hostname test: ERROR
+        line2 = self._make_line(self._get_timestamp(), "test", "ERROR")
+        self._write_logfile(self.logfile, line2)
+
+        # do check_log_multi, and create seekfile and seekfile1
+        log.clear_state()
+        log.check(self.logfile_pattern, remove_seekfile=True)
+        seekfile_1 = log._create_seek_filename(
+            self.logfile_pattern, self.logfile, trace_inode=True)
+        seekfile1_1 = log._create_seek_filename(
+            self.logfile_pattern, self.logfile1, trace_inode=True)
+        time.sleep(4)
+
+        # update logfile
+        # Dec  5 12:34:54 hostname test: ERROR
+        line3 = self._make_line(self._get_timestamp(), "test", "ERROR")
+        self._write_logfile(self.logfile, line3)
+
+        # log rotation, purge old logfile2
+        os.rename(self.logfile1, self.logfile2)
+        os.rename(self.logfile, self.logfile1)
+
+        # with dry run
+        self.config["dry_run"] = True
+        log = LogChecker(self.config)
+
+        log.clear_state()
+        log.check(
+            self.logfile_pattern, remove_seekfile=True)
+        seekfile1_2 = log._create_seek_filename(
+            self.logfile_pattern, self.logfile1, trace_inode=True)
+
+        self.assertEqual(log.get_state(), LogChecker.STATE_WARNING)
+        self.assertEqual(
+            log.get_message(),
+            self.MESSAGE_WARNING_ONE.format(line3, self.logfile1))
+        self.assertEqual(seekfile_1, seekfile1_2)
+        self.assertTrue(os.path.exists(seekfile1_1))
         self.assertTrue(os.path.exists(seekfile1_2))
 
     def test_replace_pipe_symbol(self):
@@ -901,6 +1060,59 @@ class LogCheckerTestCase(unittest.TestCase):
         log.check(self.logfile)
 
         self.assertEqual(log.get_state(), LogChecker.STATE_OK)
+
+        log._remove_cache(cachefile)
+
+    def test_cachetime_with_dry_run(self):
+        """--cachetime and --dry-run
+        """
+        self.config["pattern_list"] = ["ERROR"]
+        self.config["cachetime"] = 60
+        log = LogChecker(self.config)
+
+        cachefile = log._create_cache_filename(self.logfile)
+
+        # create a cache file
+        # Dec  5 12:34:50 hostname test: ERROR
+        line = self._make_line(self._get_timestamp(), "test", "ERROR")
+        self._write_logfile(self.logfile, line)
+
+        log.clear_state()
+        log.check(self.logfile)
+
+        self.assertEqual(log.get_state(), LogChecker.STATE_WARNING)
+        self.assertEqual(
+            log.get_message(),
+            self.MESSAGE_WARNING_ONE.format(line, self.logfile))
+
+        # verify it does not read a cache file.
+        self.config["dry_run"] = True
+        log = LogChecker(self.config)
+
+        # Dec  5 12:34:50 hostname test: NOOP
+        line = self._make_line(self._get_timestamp(), "test", "NOOP")
+        self._write_logfile(self.logfile, line)
+
+        log.clear_state()
+        log.check(self.logfile)
+
+        self.assertEqual(log.get_state(), LogChecker.STATE_OK)
+
+        # verify a cache file is not updated.
+        self.config["dry_run"] = False
+        log = LogChecker(self.config)
+
+        # Dec  5 12:34:50 hostname test: ERROR
+        line = self._make_line(self._get_timestamp(), "test", "ERROR")
+        self._write_logfile(self.logfile, line)
+
+        log.clear_state()
+        log.check(self.logfile)
+
+        self.assertEqual(log.get_state(), LogChecker.STATE_WARNING)
+        self.assertEqual(
+            log.get_message(),
+            self.MESSAGE_WARNING_ONE.format(line, self.logfile))
 
         log._remove_cache(cachefile)
 

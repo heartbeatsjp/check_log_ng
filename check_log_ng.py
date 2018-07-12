@@ -228,6 +228,9 @@ class LogChecker(object):
 
     def _remove_old_seekfile(self, logfile_pattern_list, tag=''):
         """Remove old seek files."""
+        if self.config['dry_run']:
+            return True
+
         cwd = os.getcwd()
         try:
             os.chdir(self.config['state_directory'])
@@ -266,6 +269,9 @@ class LogChecker(object):
 
     def _remove_old_seekfile_with_inode(self, logfile_pattern, tag=''):
         """Remove old inode-based seek files."""
+        if self.config['dry_run']:
+            return True
+
         prefix = None
         if self.config['trace_inode']:
             prefix = LogChecker.get_digest(logfile_pattern)
@@ -581,7 +587,7 @@ class LogChecker(object):
                     trace_inode=self.config['trace_inode'], tag=tag)
             self._check_log(logfile_pattern, seekfile)
 
-        if self.config['cachetime'] > 0 and not self.config['dry_run']:
+        if self.config['cachetime'] > 0:
             self._update_cache(cachefile)
 
         LogChecker.unlock(lockfile, lockfileobj)
@@ -652,8 +658,7 @@ class LogChecker(object):
                 self.critical_found_messages.append(
                     "{0} at {1}".format(LogChecker._join_header_and_message(critical_found), logfile))
 
-        if not self.config['dry_run']:
-            LogChecker._update_seekfile(seekfile, end_position)
+        self._update_seekfile(seekfile, end_position)
         return
 
     def check_log_multi(
@@ -728,6 +733,9 @@ class LogChecker(object):
 
     def _get_cache(self, cachefile):
         """Get the cache."""
+        if self.config['dry_run']:
+            return LogChecker.STATE_NO_CACHE, None
+
         if not os.path.exists(cachefile):
             return LogChecker.STATE_NO_CACHE, None
         if os.stat(cachefile).st_mtime < time.time() - self.config['cachetime']:
@@ -742,6 +750,9 @@ class LogChecker(object):
 
     def _update_cache(self, cachefile):
         """Update the cache."""
+        if self.config['dry_run']:
+            return True
+
         tmp_cachefile = cachefile + "." + str(os.getpid())
         with io.open(tmp_cachefile, mode='w', encoding='utf-8') as cachefileobj:
             cachefileobj.write(LogChecker.to_unicode(str(self.get_state())))
@@ -754,6 +765,9 @@ class LogChecker(object):
 
     def _remove_cache(self, cachefile):
         """Remove the cache file."""
+        if self.config['dry_run']:
+            return True
+
         if os.path.isfile(cachefile):
             os.unlink(cachefile)
 
@@ -819,9 +833,11 @@ class LogChecker(object):
             logformat = logformat.replace(key, item[key])
         return logformat
 
-    @staticmethod
-    def _update_seekfile(seekfile, position):
+    def _update_seekfile(self, seekfile, position):
         """Update the seek file for the log file."""
+        if self.config['dry_run']:
+            return True
+
         tmp_seekfile = seekfile + "." + str(os.getpid())
         with io.open(tmp_seekfile, mode='w', encoding='utf-8') as fileobj:
             fileobj.write(LogChecker.to_unicode(str(position)))
@@ -1015,7 +1031,8 @@ def _make_parser():
         action="store_true",
         dest="dry_run",
         default=False,
-        help=("Do dry run. It does not update seek files and a cache file. "
+        help=("Do dry run. "
+              "The seek files are not updated and cache file is not used. "
               "If log format is not correct, it prints an error message.")
     )
     parser.add_argument(
