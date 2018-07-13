@@ -50,7 +50,7 @@ except ImportError as _ex:
         raise _ex
 
 # Globals
-__version__ = '2.0.7'
+__version__ = '2.0.8'
 
 
 class LogChecker(object):
