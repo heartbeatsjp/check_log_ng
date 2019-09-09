@@ -549,8 +549,9 @@ class LogCheckerTestCase(unittest.TestCase):
         # Dec  5 12:34:50 hostname test: ERROR
         line1 = self._make_line(self._get_timestamp(), "test", "ERROR")
         self._write_logfile(self.logfile1, line1)
+        time.sleep(1)
 
-        # Dec  5 12:34:50 hostname test: ERROR
+        # Dec  5 12:34:51 hostname test: ERROR
         line2 = self._make_line(self._get_timestamp(), "test", "ERROR")
         self._write_logfile(self.logfile2, line2)
         log.clear_state()
@@ -563,11 +564,12 @@ class LogCheckerTestCase(unittest.TestCase):
                 line1, self.logfile1, line2, self.logfile2))
 
         # --logfile option with multiple filenames
-        # Dec  5 12:34:50 hostname test: ERROR
+        # Dec  5 12:34:51 hostname test: ERROR
         line1 = self._make_line(self._get_timestamp(), "test", "ERROR")
         self._write_logfile(self.logfile1, line1)
+        time.sleep(1)
 
-        # Dec  5 12:34:50 hostname test: ERROR
+        # Dec  5 12:34:52 hostname test: ERROR
         line2 = self._make_line(self._get_timestamp(), "test", "ERROR")
         self._write_logfile(self.logfile2, line2)
         logfile_pattern = "{0} {1}".format(self.logfile1, self.logfile2)
