@@ -359,3 +359,19 @@ python -O check_log_ng.py ...
 ## Todo
 
 - improve the current test code coverage
+
+----
+
+# for Commiters
+
+## How to release
+
+1. confirm that all tests are green
+1. `git checkout master && git pull`
+1. change `__version__` in `check_log_ng.py`
+    - based on semantic versioning
+1. `git commit check_log_ng.py -m "version up"`
+1. `git tag -a <VERSION> -m <VERSION>` (`<VERSION>` is `2.0.8` etc... )
+1. `git push`
+1. `git push --tags`
+1. confirm that new version is listed on [release page](https://github.com/heartbeatsjp/check_log_ng/releases)
